@@ -79,7 +79,8 @@ void printMetaData(MetaDataType type, const char *str, int len)
   Serial.println(str);
 }
 
-void sayHello(void)
+// 1 - Hello sound; 0 - Bye sound
+void sayHelloBye(bool choice)
 {
   // clean up the references
   if (player)
@@ -100,37 +101,7 @@ void sayHello(void)
   player = new AudioPlayer(*source, i2s, helix);
   player->setMetadataCallback(printMetaData);
 
-  if (!player->begin(1)) // index 1 is the 2nd file in the flash - hello.mp3
-  {
-    Serial.println("Failed to start player");
-    return;
-  }
-
-  player->copyAll();
-}
-
-void sayBye(void)
-{
-  // clean up the references
-  if (player)
-  {
-    player->end();
-    delete player;
-    player = nullptr;
-  }
-
-  if (source)
-  {
-    delete source;
-    source = nullptr;
-  }
-  // Create a new AudioSourceSPIFFS for this file
-  // AudioSourceSPIFFS *source = new AudioSourceSPIFFS("/", ".mp3");
-  source = new AudioSourceSPIFFS("/", ".mp3");
-  player = new AudioPlayer(*source, i2s, helix);
-  player->setMetadataCallback(printMetaData);
-
-  if (!player->begin(0)) // index 0 is the 1st file in the flash - bye.mp3
+  if (!player->begin(choice)) //  hello.mp3 or bye.mp3
   {
     Serial.println("Failed to start player");
     return;
@@ -161,7 +132,7 @@ void encoder_task(void *param)
     if (isPressed && !longPressTriggered && (millis() - pressStartTime >= ENCODER_BTN_HOLD_TIME))
     {
       // Button held long enough
-      sayBye();
+      sayHelloBye(0);
       Serial.println("Long press detected. Shutting down...");
       longPressTriggered = true;
 
@@ -194,7 +165,7 @@ void encoder_task(void *param)
 
 void playStartSoundTask(void *param)
 {
-  sayHello();
+  sayHelloBye(1);
   // i2s.end(); // do it in another functions - reinitialise the "stream"
   startupDone = true;
   vTaskDelete(NULL); // kill current task
