@@ -6,6 +6,7 @@
 #include "AudioTools.h"
 #include "AudioTools/Disk/AudioSourceSPIFFS.h"
 #include "AudioTools/AudioCodecs/CodecMP3Helix.h"
+#include "driver/i2s.h"
 
 #include "BluetoothA2DPSink.h"
 #include "utilities.h"
@@ -15,18 +16,25 @@
 
 // GLOBAL VARS AND OBJECTS
 bool startupDone = false;
+static lv_obj_t *current_screen = NULL;
 
 // Encoder variables
 ESP32Encoder encoder;
 volatile int64_t encoderPos = 0;
 lv_indev_t *enc_indev;
 lv_group_t *focus_group;
+lv_obj_t *menu_buttons[4];
+lv_obj_t *menu_screens[4];
 
 // Button variables
 Bounce button = Bounce();
 unsigned long pressStartTime = 0;
 bool isPressed = false;
 bool longPressTriggered = false;
+unsigned long lastClickTime = 0;
+bool firstClickDetected = false;
+const unsigned long doubleClickThreshold = 600; // ms
+bool waitingForSecondClick = false;
 
 // Audio objects
 AudioInfo info(44100, 2, 16);
@@ -60,7 +68,6 @@ void setup_encoder_focus_group()
   lv_group_add_obj(focus_group, objects.equalizer);
   lv_group_add_obj(focus_group, objects.settings);
 
-  // Optional: make sure objects are focusable
   lv_obj_add_flag(objects.bluetooth, LV_OBJ_FLAG_SCROLL_ON_FOCUS | LV_OBJ_FLAG_CLICKABLE);
   lv_obj_add_flag(objects.inet_radio, LV_OBJ_FLAG_SCROLL_ON_FOCUS | LV_OBJ_FLAG_CLICKABLE);
   lv_obj_add_flag(objects.equalizer, LV_OBJ_FLAG_SCROLL_ON_FOCUS | LV_OBJ_FLAG_CLICKABLE);
@@ -79,10 +86,8 @@ void printMetaData(MetaDataType type, const char *str, int len)
   Serial.println(str);
 }
 
-// 1 - Hello sound; 0 - Bye sound
-void sayHelloBye(bool choice)
+void stop_audio_playback()
 {
-  // clean up the references
   if (player)
   {
     player->end();
@@ -95,6 +100,15 @@ void sayHelloBye(bool choice)
     delete source;
     source = nullptr;
   }
+
+  Serial.println("Audio playback stopped, resources freed.");
+}
+
+// 1 - Hello sound; 0 - Bye sound
+void sayHelloBye(bool choice)
+{
+  // free up the resources for audio stream
+  stop_audio_playback();
 
   // Create a new AudioSourceSPIFFS for this file
   source = new AudioSourceSPIFFS("/", ".mp3");
@@ -110,7 +124,29 @@ void sayHelloBye(bool choice)
   player->copyAll();
 }
 
+void switch_to_screen(void *screen_ptr)
+{
+  lv_obj_t *target = (lv_obj_t *)screen_ptr;
+
+  // deinit BT when leaving bt_screen
+  if (current_screen == objects.bt_screen && target != objects.bt_screen)
+  {
+    Serial.println("Stopping A2DP sink...");
+    // a2dp_sink.end();
+  }
+
+  // Init BT when switching to bt_screen
+  if (target == objects.bt_screen)
+  {
+    Serial.println("Starting A2DP sink...");
+  }
+
+  lv_disp_load_scr(target);
+  current_screen = target; // save current active screen
+}
+
 ///////////// RTOS TASKS /////////////
+
 // Encoder AND button handling
 void encoder_task(void *param)
 {
@@ -118,7 +154,7 @@ void encoder_task(void *param)
   while (1)
   {
     encoderPos = encoder.getCount() / 2;
-    button.update();
+    button.update(); // must be called repeatedly
 
     // button logic
     if (button.fell())
@@ -145,19 +181,42 @@ void encoder_task(void *param)
       // Button just released
       if (!longPressTriggered)
       {
-        // Short click
-        Serial.println("Short click detected. Triggering LVGL action.");
+        unsigned long now = millis();
+
+        // Double Click, switch back to the main screen
+        if (waitingForSecondClick && (now - lastClickTime < doubleClickThreshold))
+        {
+          lv_async_call(switch_to_screen, objects.main);
+          waitingForSecondClick = false;
+        }
+        else
+        {
+          waitingForSecondClick = true;
+          lastClickTime = now;
+        }
       }
+
       isPressed = false;
     }
-    // button logic end
 
-    // encoder values for debugging
-    // if (encoderPos != last_val)
-    // {
-    //   Serial.printf("[Encoder] Position: %lld\n", encoderPos);
-    //   last_val = encoderPos;
-    // }
+    if (waitingForSecondClick && (millis() - lastClickTime >= doubleClickThreshold))
+    {
+      // single click
+      lv_obj_t *focused = lv_group_get_focused(focus_group);
+      if (focused)
+      {
+        for (int i = 0; i < 4; ++i)
+        {
+          if (focused == menu_buttons[i])
+          {
+            lv_async_call(switch_to_screen, menu_screens[i]);
+            break;
+          }
+        }
+      }
+
+      waitingForSecondClick = false;
+    }
 
     vTaskDelay(pdMS_TO_TICKS(10));
   }
@@ -166,7 +225,6 @@ void encoder_task(void *param)
 void playStartSoundTask(void *param)
 {
   sayHelloBye(1);
-  // i2s.end(); // do it in another functions - reinitialise the "stream"
   startupDone = true;
   vTaskDelete(NULL); // kill current task
 }
@@ -351,6 +409,17 @@ void setup()
   // SETUP FOCUS GROUP
   setup_encoder_focus_group();
   lv_group_focus_obj(objects.bluetooth);
+
+  menu_buttons[0] = objects.bluetooth;
+  menu_buttons[1] = objects.inet_radio;
+  menu_buttons[2] = objects.equalizer;
+  menu_buttons[3] = objects.settings;
+
+  menu_screens[0] = objects.bt_screen;
+  menu_screens[1] = objects.wifi_radio_screen;
+  menu_screens[2] = objects.equalizer_screen;
+  menu_screens[3] = objects.settings_screen;
+
   Serial.println("Focus group ready");
 
   xTaskCreatePinnedToCore(uiTask, "ui task", 4096, NULL, 1, NULL, 1);
