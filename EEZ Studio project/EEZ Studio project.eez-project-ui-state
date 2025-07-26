@@ -1,6 +1,6 @@
 {
   "navigation": {
-    "selectedUserPageObject": "[EEZ Studio project.eez-project]:/userPages/0",
+    "selectedUserPageObject": "[EEZ Studio project.eez-project]:/userPages/3",
     "subnavigationSelectedItems": {}
   },
   "layoutModel": {
@@ -121,7 +121,6 @@
                   "type": "tabset",
                   "id": "#b99f160e-831b-4d9f-8ef0-7f4a61fd4311",
                   "weight": 1,
-                  "selected": 1,
                   "enableClose": false,
                   "children": [
                     {
@@ -188,45 +187,10 @@
               "type": "tabset",
               "id": "EDITORS",
               "weight": 55.42026708562451,
-              "selected": 1,
+              "selected": -1,
               "enableDeleteWhenEmpty": false,
               "enableClose": false,
-              "children": [
-                {
-                  "type": "tab",
-                  "id": "#6da724c2-d940-438a-a0db-fa5f1cb62a28",
-                  "name": "Main",
-                  "component": "editor",
-                  "config": {
-                    "objectPath": "[EEZ Studio project.eez-project]:/userPages/0",
-                    "permanent": false
-                  },
-                  "icon": "svg:page"
-                },
-                {
-                  "type": "tab",
-                  "id": "#8371947b-58c5-4666-8fea-b0d2fe8b9a06",
-                  "name": "Settings",
-                  "component": "editor",
-                  "config": {
-                    "objectPath": "[EEZ Studio project.eez-project]:/settings",
-                    "subObjectPath": "[EEZ Studio project.eez-project]:/settings",
-                    "permanent": false
-                  },
-                  "icon": "material:settings"
-                },
-                {
-                  "type": "tab",
-                  "id": "#925099f9-ae9b-4623-99eb-a36936b7e8ec",
-                  "name": "WIFI_Radio_Screen",
-                  "component": "editor",
-                  "config": {
-                    "objectPath": "[EEZ Studio project.eez-project]:/userPages/2",
-                    "permanent": true
-                  },
-                  "icon": "svg:page"
-                }
-              ],
+              "children": [],
               "active": true
             },
             {
@@ -1069,9 +1033,9 @@
       "transform": {
         "translate": {
           "x": -160,
-          "y": -240
+          "y": -40
         },
-        "scale": 1
+        "scale": 1.25
       },
       "timeline": {
         "isEditorActive": false,
