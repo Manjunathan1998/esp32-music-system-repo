@@ -23,8 +23,12 @@ typedef struct _objects_t {
     lv_obj_t *l_qualizer;
     lv_obj_t *settings;
     lv_obj_t *l_settings;
+    lv_obj_t *header_container;
     lv_obj_t *obj2;
     lv_obj_t *obj3;
+    lv_obj_t *charge;
+    lv_obj_t *bt_status;
+    lv_obj_t *bt_status_1;
     lv_obj_t *obj4;
     lv_obj_t *obj5;
     lv_obj_t *obj6;

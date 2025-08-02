@@ -7,10 +7,12 @@
 #include "AudioTools/Disk/AudioSourceSPIFFS.h"
 #include "AudioTools/AudioCodecs/CodecMP3Helix.h"
 #include "driver/i2s.h"
+#include "esp_bt.h"
 
 #include "BluetoothA2DPSink.h"
 #include "utilities.h"
 #include "defines.h"
+#include "DisplayDriver.h"
 #include "./ui/ui.h"
 #include "./ui/actions.h"
 
@@ -47,8 +49,11 @@ AudioPlayer *player = nullptr;
 EncodedAudioStream out(&i2s, &helix); // output to decoder
 BluetoothA2DPSink a2dp_sink(i2s);
 
+// Display instance
+LGFX_Display lcd;
+
 // LVGL input device callback. Allows to use encoder in lvgl UI
-void encoder_read_cb(lv_indev_drv_t *drv, lv_indev_data_t *data)
+void encoderReadCb(lv_indev_drv_t *drv, lv_indev_data_t *data)
 {
   static int64_t last = 0;
   int64_t pos = encoderPos;
@@ -59,7 +64,7 @@ void encoder_read_cb(lv_indev_drv_t *drv, lv_indev_data_t *data)
 }
 
 // FOCUS GROUP SETUP
-void setup_encoder_focus_group()
+void setupEncoderFocusGroup()
 {
   focus_group = lv_group_create();
 
@@ -86,29 +91,11 @@ void printMetaData(MetaDataType type, const char *str, int len)
   Serial.println(str);
 }
 
-void stop_audio_playback()
-{
-  if (player)
-  {
-    player->end();
-    delete player;
-    player = nullptr;
-  }
-
-  if (source)
-  {
-    delete source;
-    source = nullptr;
-  }
-
-  Serial.println("Audio playback stopped, resources freed.");
-}
-
 // 1 - Hello sound; 0 - Bye sound
 void sayHelloBye(bool choice)
 {
   // free up the resources for audio stream
-  stop_audio_playback();
+  // stop_audio_playback();
 
   // Create a new AudioSourceSPIFFS for this file
   source = new AudioSourceSPIFFS("/", ".mp3");
@@ -124,7 +111,75 @@ void sayHelloBye(bool choice)
   player->copyAll();
 }
 
-void switch_to_screen(void *screen_ptr)
+void stop_audio_playback()
+{
+  if (player)
+  {
+    player->end();
+    delete player;
+    player = nullptr;
+  }
+
+  if (source)
+  {
+    delete source;
+    source = nullptr;
+  }
+
+  i2s.flush(); // Flush pending audio frames (safe if I2S is still active)
+  i2s.end();
+  delay(100);
+  Serial.println("Audio playback stopped, resources freed.");
+}
+
+void restartBT()
+{
+  esp_err_t err;
+
+  err = btStop();
+  if (err != ESP_OK)
+  {
+    Serial.printf("btStop failed: %d\n", err);
+  }
+  else
+  {
+    Serial.println("btStop success");
+  }
+
+  delay(100);
+
+  err = btStart();
+  if (err != ESP_OK)
+  {
+    Serial.printf("btStart failed: %d\n", err);
+  }
+  else
+  {
+    Serial.println("btStart success");
+  }
+}
+
+// Start BT sink. Call this function when user switches to Bluetooth menu
+void init_a2dp_sink()
+{
+  Serial.println("Initializing Bluetooth sink...");
+  restartBT();
+
+  auto cfg = i2s.defaultConfig(TX_MODE);
+  cfg.pin_bck = I2S_BCK;
+  cfg.pin_ws = I2S_WS;
+  cfg.pin_data = I2S_DATA;
+  cfg.copyFrom(info);
+  i2s.begin(cfg);
+
+  a2dp_sink.set_volume(50);              // Optional: set initial volume
+  a2dp_sink.set_auto_reconnect(true, 5); // Auto reconnect if disconnected
+  a2dp_sink.start("ESP32 Music");        // Advertise device name
+
+  Serial.println("Bluetooth sink started... maybe");
+}
+
+void switchToScreen(void *screen_ptr)
 {
   lv_obj_t *target = (lv_obj_t *)screen_ptr;
 
@@ -132,15 +187,19 @@ void switch_to_screen(void *screen_ptr)
   if (current_screen == objects.bt_screen && target != objects.bt_screen)
   {
     Serial.println("Stopping A2DP sink...");
-    // a2dp_sink.end();
+    a2dp_sink.end();
   }
 
   // Init BT when switching to bt_screen
   if (target == objects.bt_screen)
   {
+    // todo add if bt is initialised
     Serial.println("Starting A2DP sink...");
+    stop_audio_playback();
+    init_a2dp_sink();
   }
 
+  // load selected screen
   lv_disp_load_scr(target);
   current_screen = target; // save current active screen
 }
@@ -148,7 +207,7 @@ void switch_to_screen(void *screen_ptr)
 ///////////// RTOS TASKS /////////////
 
 // Encoder AND button handling
-void encoder_task(void *param)
+void encoderTask(void *param)
 {
   int16_t last_val = 0;
   while (1)
@@ -186,7 +245,7 @@ void encoder_task(void *param)
         // Double Click, switch back to the main screen
         if (waitingForSecondClick && (now - lastClickTime < doubleClickThreshold))
         {
-          lv_async_call(switch_to_screen, objects.main);
+          lv_async_call(switchToScreen, objects.main);
           waitingForSecondClick = false;
         }
         else
@@ -209,7 +268,7 @@ void encoder_task(void *param)
         {
           if (focused == menu_buttons[i])
           {
-            lv_async_call(switch_to_screen, menu_screens[i]);
+            lv_async_call(switchToScreen, menu_screens[i]);
             break;
           }
         }
@@ -243,80 +302,6 @@ void uiTask(void *param)
 
 ///////////// RTOS TASKS end /////////////
 
-// Create a display panel instance with manual settings for ST7796
-class LGFX_Display : public lgfx::LGFX_Device
-{
-public:
-  lgfx::Panel_ST7796 _panel; // ST7796 display
-  lgfx::Bus_SPI _bus;
-  lgfx::Light_PWM _light;    // Backlight control
-  lgfx::Touch_FT5x06 _touch; // FT6336U touch controller (I2C)
-
-  LGFX_Display()
-  {
-    // Bus (SPI) configuration
-    {
-      auto cfg = _bus.config();
-      // SPI pins
-      cfg.spi_host = HSPI_HOST;
-      cfg.pin_sclk = TFT_SCLK_PIN;
-      cfg.pin_mosi = TFT_MOSI_PIN;
-      cfg.pin_miso = TFT_MISO_PIN; // unused
-      cfg.pin_dc = TFT_DC_PIN;
-      cfg.freq_write = 60000000;
-      _bus.config(cfg);
-      _panel.setBus(&_bus);
-    }
-
-    // Panel configuration
-    {
-      auto cfg = _panel.config();
-      cfg.pin_cs = TFT_CS_PIN;
-      cfg.pin_rst = TFT_RST_PIN;
-      cfg.pin_busy = -1; // Busy (-1 = unused)
-
-      // Display parameters - adjust based on your display specs
-      cfg.panel_width = TFT_W;
-      cfg.panel_height = TFT_H;
-      cfg.offset_x = 0;
-      cfg.offset_y = 0;
-      _panel.config(cfg);
-    }
-
-    // Backlight configuration
-    {
-      auto cfg = _light.config();
-      cfg.pin_bl = TFT_BL_PIN; // TFT_BCKL
-      cfg.invert = false;      // Set to true if LOW turns backlight ON
-      cfg.freq = 44100;        // PWM frequency
-      cfg.pwm_channel = 7;     // PWM channel
-      _light.config(cfg);
-      _panel.setLight(&_light);
-    }
-
-    // Touch configuration (I2C)
-    {
-      auto cfg = _touch.config();
-      cfg.x_min = 0;
-      cfg.x_max = 319;
-      cfg.y_min = 0;
-      cfg.y_max = 479;
-      cfg.pin_sda = 18;    // TOUCH_SDA
-      cfg.pin_scl = 19;    // TOUCH_SCL
-      cfg.i2c_addr = 0x38; // I2C_TOUCH_ADDRESS
-      cfg.i2c_port = 1;    // I2C port number
-      cfg.freq = 400000;   // I2C frequency
-      _touch.config(cfg);
-      _panel.setTouch(&_touch);
-    }
-
-    setPanel(&_panel);
-  }
-};
-
-// Display instance
-LGFX_Display lcd;
-
 // LVGL buffer
 static lv_disp_draw_buf_t draw_buf;
 static lv_color_t *buf = NULL;
@@ -333,14 +318,28 @@ void setup()
     Serial.println("Failed to mount SPIFFS");
   }
 
+  size_t psramSize = heap_caps_get_total_size(MALLOC_CAP_SPIRAM);
+  Serial.printf("Total PSRAM available: %u bytes\n", psramSize);
+
+  if (psramSize == 0)
+  {
+    Serial.println("Warning: PSRAM not detected!");
+  }
+  else
+  {
+    Serial.println("PSRAM is enabled and ready.");
+  }
+
   // Encoder setup start
   ESP32Encoder::useInternalWeakPullResistors = puType::up;
   encoder.attachHalfQuad(ENCODER_CLK_PIN, ENCODER_DT_PIN);
-  xTaskCreatePinnedToCore(encoder_task, "EncoderTask", 6144, NULL, 1, NULL, 1);
+  xTaskCreatePinnedToCore(encoderTask, "EncoderTask", 6144, NULL, 1, NULL, 1);
   // Encoder button setup
   button.attach(ENCODER_BTN_PIN, INPUT_PULLUP);
   button.interval(10);
   Serial.println("Encoder initialized");
+
+  Serial.printf("Free heap before BT start: %u bytes\n", esp_get_free_heap_size());
 
   // I2S and audio setup
   AudioToolsLogger.begin(Serial, AudioToolsLogLevel::Info);
@@ -352,13 +351,13 @@ void setup()
   cfg.copyFrom(info);
   i2s.begin(cfg);
 
-  xTaskCreatePinnedToCore(playStartSoundTask, "start sound", 4096, NULL, 2, NULL, 1);
-
-  // TODO BT sink init after choosing the "Bluetooth" menu option
-  // Serial.println("Starting Bluetooth sink...");
   // a2dp_sink.set_volume(50);
   // a2dp_sink.set_auto_reconnect(true, 5);
   // a2dp_sink.start("ESP32 Music");
+
+  Serial.printf("Free heap after BT start: %u bytes\n", esp_get_free_heap_size());
+
+  xTaskCreatePinnedToCore(playStartSoundTask, "start sound", 4096, NULL, 2, NULL, 1);
 
   // Initialize display
   lcd.init();
@@ -367,7 +366,7 @@ void setup()
 
   // Initialize display buffer
   buf = (lv_color_t *)heap_caps_malloc(TFT_W * 40 * sizeof(lv_color_t),
-                                       MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+                                       MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
 
   // Check buffer allocation
   if (!buf)
@@ -399,7 +398,7 @@ void setup()
   static lv_indev_drv_t indev_drv;
   lv_indev_drv_init(&indev_drv);
   indev_drv.type = LV_INDEV_TYPE_ENCODER;
-  indev_drv.read_cb = encoder_read_cb;
+  indev_drv.read_cb = encoderReadCb;
   enc_indev = lv_indev_drv_register(&indev_drv);
 
   Serial.println("Encoder registered with LVGL");
@@ -407,7 +406,7 @@ void setup()
   ui_init();
 
   // SETUP FOCUS GROUP
-  setup_encoder_focus_group();
+  setupEncoderFocusGroup();
   lv_group_focus_obj(objects.bluetooth);
 
   menu_buttons[0] = objects.bluetooth;
@@ -437,7 +436,7 @@ void loop()
   }
 }
 
-// LVGL callback implementations
+// LVGL callback
 void display_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p)
 {
   uint32_t w = (area->x2 - area->x1 + 1);

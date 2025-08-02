@@ -1,6 +1,6 @@
 {
   "navigation": {
-    "selectedUserPageObject": "[EEZ Studio project.eez-project]:/userPages/3",
+    "selectedUserPageObject": "[EEZ Studio project.eez-project]:/userPages/0",
     "subnavigationSelectedItems": {}
   },
   "layoutModel": {
@@ -68,7 +68,8 @@
           },
           {
             "type": "border",
-            "size": 275.09375,
+            "selected": 0,
+            "size": 0.09375,
             "location": "bottom",
             "children": [
               {
@@ -115,7 +116,7 @@
             {
               "type": "row",
               "id": "#bf90daa9-abb4-4dcb-a33b-71ae090c3fba",
-              "weight": 15,
+              "weight": 22.114903610381134,
               "children": [
                 {
                   "type": "tabset",
@@ -186,11 +187,46 @@
             {
               "type": "tabset",
               "id": "EDITORS",
-              "weight": 55.42026708562451,
-              "selected": -1,
+              "weight": 48.30536347524338,
+              "selected": 1,
               "enableDeleteWhenEmpty": false,
               "enableClose": false,
-              "children": [],
+              "children": [
+                {
+                  "type": "tab",
+                  "id": "#e951c762-3bc4-4d4d-ad3f-0cb8f017412d",
+                  "name": "Settings",
+                  "component": "editor",
+                  "config": {
+                    "objectPath": "[EEZ Studio project.eez-project]:/settings",
+                    "subObjectPath": "[EEZ Studio project.eez-project]:/settings",
+                    "permanent": false
+                  },
+                  "icon": "material:settings"
+                },
+                {
+                  "type": "tab",
+                  "id": "#6872041f-98bb-483d-8d04-1adc28c227f2",
+                  "name": "Main",
+                  "component": "editor",
+                  "config": {
+                    "objectPath": "[EEZ Studio project.eez-project]:/userPages/0",
+                    "permanent": false
+                  },
+                  "icon": "svg:page"
+                },
+                {
+                  "type": "tab",
+                  "id": "#925099f9-ae9b-4623-99eb-a36936b7e8ec",
+                  "name": "WIFI_Radio_Screen",
+                  "component": "editor",
+                  "config": {
+                    "objectPath": "[EEZ Studio project.eez-project]:/userPages/2",
+                    "permanent": true
+                  },
+                  "icon": "svg:page"
+                }
+              ],
               "active": true
             },
             {
@@ -201,7 +237,7 @@
                 {
                   "type": "tabset",
                   "id": "#ef461f77-548f-4289-a1b6-22df231a5404",
-                  "weight": 2.554364471669219,
+                  "weight": 2.365296803652968,
                   "children": [
                     {
                       "type": "tab",
@@ -216,7 +252,7 @@
                 {
                   "type": "tabset",
                   "id": "#3e063630-e8ff-4042-a1f0-d0025cb7e43e",
-                  "weight": 0.445635528330781,
+                  "weight": 0.634703196347032,
                   "children": [
                     {
                       "type": "tab",
@@ -973,19 +1009,25 @@
         "0": {
           "0": {},
           "1": {
-            "0": {},
+            "0": {
+              "0": {}
+            },
+            "1": {},
+            "2": {},
             "3": {}
           },
-          "3": {}
-        },
-        "$selected": true
+          "2": {
+            "0": {},
+            "1": {}
+          }
+        }
       },
       "transform": {
         "translate": {
-          "x": -160,
-          "y": -240
+          "x": -301.3766481365923,
+          "y": -251.0929191523556
         },
-        "scale": 1.25
+        "scale": 1.75
       },
       "timeline": {
         "isEditorActive": false,
@@ -996,14 +1038,18 @@
     },
     "[EEZ Studio project.eez-project]:/userPages/1[flow-state]": {
       "selection": {
-        "0": {}
+        "0": {
+          "0": {},
+          "1": {},
+          "4": {}
+        }
       },
       "transform": {
         "translate": {
-          "x": -103.199951171875,
-          "y": -228
+          "x": -237.47164988199873,
+          "y": -168.10855066935224
         },
-        "scale": 1
+        "scale": 1.25
       },
       "timeline": {
         "isEditorActive": false,
@@ -1013,13 +1059,15 @@
       }
     },
     "[EEZ Studio project.eez-project]:/userPages/2[flow-state]": {
-      "selection": {},
+      "selection": {
+        "0": {}
+      },
       "transform": {
         "translate": {
-          "x": -160,
-          "y": -240
+          "x": -300.79998779296875,
+          "y": -222.39999389648438
         },
-        "scale": 1.25
+        "scale": 1.75
       },
       "timeline": {
         "isEditorActive": false,
@@ -1029,13 +1077,48 @@
       }
     },
     "[EEZ Studio project.eez-project]:/userPages/3[flow-state]": {
-      "selection": {},
+      "selection": {
+        "0": {
+          "4": {
+            "$selected": true
+          }
+        }
+      },
       "transform": {
         "translate": {
-          "x": -160,
-          "y": -40
+          "x": -400,
+          "y": -240
         },
-        "scale": 1.25
+        "scale": 5
+      },
+      "timeline": {
+        "isEditorActive": false,
+        "position": 0,
+        "secondToPx": 200,
+        "scrollLeft": 0
+      }
+    },
+    "[EEZ Studio project.eez-project]:/userPages/4[flow-state]": {
+      "selection": {
+        "0": {
+          "0": {
+            "0": {
+              "0": {
+                "$selected": true
+              },
+              "1": {
+                "$selected": true
+              }
+            }
+          }
+        }
+      },
+      "transform": {
+        "translate": {
+          "x": -161.0222222222222,
+          "y": -84.05938056665664
+        },
+        "scale": 0.8
       },
       "timeline": {
         "isEditorActive": false,
@@ -1057,13 +1140,14 @@
   "showComponentDescriptions": true,
   "logsPanelFilter": "all",
   "selectedStylePropertyName": "",
-  "lvglPart": "MAIN",
-  "lvglState": "CHECKED|PRESSED",
+  "lvglPart": "INDICATOR",
+  "lvglState": "DEFAULT",
   "lvglExpandedPropertiesGroup": [
+    "TEXT",
     "MISCELLANEOUS"
   ],
   "showInactiveFlowsInDebugger": true,
   "globalFlowZoom": true,
-  "flowZoom": 1.25,
+  "flowZoom": 1.75,
   "implementationLanguage": "C"
 }
