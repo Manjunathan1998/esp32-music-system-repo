@@ -16,9 +16,25 @@
 #include "./ui/ui.h"
 #include "./ui/actions.h"
 
+
 // GLOBAL VARS AND OBJECTS
 bool startupDone = false;
+bool btSinkActive = false;
 static lv_obj_t *current_screen = NULL;
+
+// All internal commands
+enum AppCommand
+{
+  CMD_NONE,
+  CMD_SWITCH_TO_SCR_MAIN,
+  CMD_SWITCH_TO_SCR_BT,
+  CMD_SWITCH_TO_SCR_WIFI_RADIO,
+  CMD_SWITCH_TO_SCR_SETTINGS,
+  CMD_BT_RESTART,
+  CMD_BT_STOP
+};
+
+QueueHandle_t appCommandQueue; // "transmits" the app commands
 
 // Encoder variables
 ESP32Encoder encoder;
@@ -51,6 +67,10 @@ BluetoothA2DPSink a2dp_sink(i2s);
 
 // Display instance
 LGFX_Display lcd;
+
+// LVGL buffer
+static lv_disp_draw_buf_t draw_buf;
+static lv_color_t *buf = NULL;
 
 // LVGL input device callback. Allows to use encoder in lvgl UI
 void encoderReadCb(lv_indev_drv_t *drv, lv_indev_data_t *data)
@@ -91,27 +111,7 @@ void printMetaData(MetaDataType type, const char *str, int len)
   Serial.println(str);
 }
 
-// 1 - Hello sound; 0 - Bye sound
-void sayHelloBye(bool choice)
-{
-  // free up the resources for audio stream
-  // stop_audio_playback();
-
-  // Create a new AudioSourceSPIFFS for this file
-  source = new AudioSourceSPIFFS("/", ".mp3");
-  player = new AudioPlayer(*source, i2s, helix);
-  player->setMetadataCallback(printMetaData);
-
-  if (!player->begin(choice)) //  hello.mp3 or bye.mp3
-  {
-    Serial.println("Failed to start player");
-    return;
-  }
-
-  player->copyAll();
-}
-
-void stop_audio_playback()
+void stop_audio_playback() // todo rename - freeI2S
 {
   if (player)
   {
@@ -128,83 +128,177 @@ void stop_audio_playback()
 
   i2s.flush(); // Flush pending audio frames (safe if I2S is still active)
   i2s.end();
-  delay(100);
+  vTaskDelay(100 / portTICK_PERIOD_MS);
   Serial.println("Audio playback stopped, resources freed.");
 }
 
-void restartBT()
+// 1 - Hello sound; 0 - Bye sound
+void sayHelloBye(bool choice)
 {
-  esp_err_t err;
+  // Create a new AudioSourceSPIFFS for this file
+  source = new AudioSourceSPIFFS("/", ".mp3");
+  player = new AudioPlayer(*source, i2s, helix);
+  player->setMetadataCallback(printMetaData);
 
-  err = btStop();
-  if (err != ESP_OK)
+  if (!player->begin(choice)) //  hello.mp3 or bye.mp3
   {
-    Serial.printf("btStop failed: %d\n", err);
-  }
-  else
-  {
-    Serial.println("btStop success");
+    Serial.println("Failed to start player");
+    return;
   }
 
-  delay(100);
-
-  err = btStart();
-  if (err != ESP_OK)
-  {
-    Serial.printf("btStart failed: %d\n", err);
-  }
-  else
-  {
-    Serial.println("btStart success");
-  }
-}
-
-// Start BT sink. Call this function when user switches to Bluetooth menu
-void init_a2dp_sink()
-{
-  Serial.println("Initializing Bluetooth sink...");
-  restartBT();
-
-  auto cfg = i2s.defaultConfig(TX_MODE);
-  cfg.pin_bck = I2S_BCK;
-  cfg.pin_ws = I2S_WS;
-  cfg.pin_data = I2S_DATA;
-  cfg.copyFrom(info);
-  i2s.begin(cfg);
-
-  a2dp_sink.set_volume(50);              // Optional: set initial volume
-  a2dp_sink.set_auto_reconnect(true, 5); // Auto reconnect if disconnected
-  a2dp_sink.start("ESP32 Music");        // Advertise device name
-
-  Serial.println("Bluetooth sink started... maybe");
+  player->copyAll();
 }
 
 void switchToScreen(void *screen_ptr)
 {
   lv_obj_t *target = (lv_obj_t *)screen_ptr;
-
-  // deinit BT when leaving bt_screen
-  if (current_screen == objects.bt_screen && target != objects.bt_screen)
-  {
-    Serial.println("Stopping A2DP sink...");
-    a2dp_sink.end();
-  }
-
-  // Init BT when switching to bt_screen
-  if (target == objects.bt_screen)
-  {
-    // todo add if bt is initialised
-    Serial.println("Starting A2DP sink...");
-    stop_audio_playback();
-    init_a2dp_sink();
-  }
-
-  // load selected screen
   lv_disp_load_scr(target);
   current_screen = target; // save current active screen
 }
 
+// Start BT sink. Call this function when user switches to Bluetooth menu
+void initBtSink()
+{
+  if (btSinkActive )
+    return;
+
+  Serial.println("Initializing Bluetooth sink...");
+
+  // a2dp_sink = new BluetoothA2DPSink(i2s);
+
+  if (!i2s.isActive())
+  {
+    auto cfg = i2s.defaultConfig(TX_MODE);
+    cfg.pin_bck = I2S_BCK;
+    cfg.pin_ws = I2S_WS;
+    cfg.pin_data = I2S_DATA;
+    cfg.copyFrom(info);
+    i2s.begin(cfg);
+  }
+
+  a2dp_sink.set_volume(50);              // Optional: set initial volume
+  a2dp_sink.set_auto_reconnect(true, 5); // Auto reconnect if disconnected
+  a2dp_sink.start("ESP32 Music");        // Advertise device name
+
+  btSinkActive = true;
+  Serial.println("Bluetooth sink init done");
+}
+
+void force_bt_stack_shutdown()
+{
+  Serial.println("Forcefully shutting down Bluetooth stack...");
+
+  esp_err_t err;
+
+  // Disable bluedroid
+  if (esp_bluedroid_get_status() == ESP_BLUEDROID_STATUS_ENABLED)
+  {
+    err = esp_bluedroid_disable();
+    Serial.printf("esp_bluedroid_disable: %s\n", esp_err_to_name(err));
+  }
+
+  // Deinit bluedroid
+  if (esp_bluedroid_get_status() != ESP_BLUEDROID_STATUS_UNINITIALIZED)
+  {
+    err = esp_bluedroid_deinit();
+    Serial.printf("esp_bluedroid_deinit: %s\n", esp_err_to_name(err));
+  }
+
+  // Disable BT controller
+  if (esp_bt_controller_get_status() == ESP_BT_CONTROLLER_STATUS_ENABLED)
+  {
+    err = esp_bt_controller_disable();
+    Serial.printf("esp_bt_controller_disable: %s\n", esp_err_to_name(err));
+  }
+
+  // Deinit BT controller
+  if (esp_bt_controller_get_status() != ESP_BT_CONTROLLER_STATUS_IDLE)
+  {
+    err = esp_bt_controller_deinit();
+    Serial.printf("esp_bt_controller_deinit: %s\n", esp_err_to_name(err));
+  }
+}
+
+void stopBtSink()
+{
+  if (!btSinkActive)
+    return;
+
+  // if (!a2dp_sink)
+  //   return;
+
+  Serial.println("Stopping A2DP sink...");
+  a2dp_sink.disconnect();
+  vTaskDelay(600 / portTICK_PERIOD_MS);
+  a2dp_sink.end();
+  vTaskDelay(1600 / portTICK_PERIOD_MS);
+
+  // delete a2dp_sink;
+  // a2dp_sink = nullptr;
+  Serial.println("Sink stopped");
+  btSinkActive = false;
+}
+
+void restartBtSink(void *param)
+{
+  if (btSinkActive)
+  {
+    Serial.println("btSinkActive = true, calling stopBtSink()");
+    stopBtSink();
+  }
+  else
+  {
+    Serial.println("btSinkActive = false, calling initBtSink()");
+  }
+
+  // force_bt_stack_shutdown();       // Extra guarantee
+  vTaskDelay(pdMS_TO_TICKS(1600)); // Wait before restarting
+
+  initBtSink();
+  vTaskDelete(NULL); // kill self
+}
+// ^^^
+void request_bt_restart()
+{
+  xTaskCreatePinnedToCore(restartBtSink, "BT_Restart", 4096, NULL, 1, NULL, 0); // core 0
+}
+
 ///////////// RTOS TASKS /////////////
+
+void appTask(void *param)
+{
+  AppCommand cmd;
+  while (1)
+  {
+    if (xQueueReceive(appCommandQueue, &cmd, portMAX_DELAY) == pdTRUE)
+    {
+      switch (cmd)
+      {
+      case CMD_SWITCH_TO_SCR_MAIN:
+        lv_async_call([](void *unused)
+                      {
+                        switchToScreen(objects.main);
+                        stopBtSink(); },
+                      NULL);
+        break;
+
+      case CMD_SWITCH_TO_SCR_BT:
+        lv_async_call([](void *unused)
+                      {switchToScreen(menu_screens[0]); 
+                      initBtSink(); },
+                      NULL);
+        break;
+      case CMD_BT_STOP:
+        // todo add bt stop on encoder double click if curr. screen == bt
+        Serial.println("Command BT stop");
+        break;
+
+      default:
+        break;
+      }
+    }
+  }
+}
 
 // Encoder AND button handling
 void encoderTask(void *param)
@@ -245,7 +339,8 @@ void encoderTask(void *param)
         // Double Click, switch back to the main screen
         if (waitingForSecondClick && (now - lastClickTime < doubleClickThreshold))
         {
-          lv_async_call(switchToScreen, objects.main);
+          AppCommand cmd = CMD_SWITCH_TO_SCR_MAIN;
+          xQueueSend(appCommandQueue, &cmd, 0);
           waitingForSecondClick = false;
         }
         else
@@ -264,13 +359,33 @@ void encoderTask(void *param)
       lv_obj_t *focused = lv_group_get_focused(focus_group);
       if (focused)
       {
+        AppCommand cmd = CMD_NONE;
         for (int i = 0; i < 4; ++i)
         {
           if (focused == menu_buttons[i])
           {
-            lv_async_call(switchToScreen, menu_screens[i]);
+            switch (i)
+            {
+            case 0:
+              cmd = CMD_SWITCH_TO_SCR_BT;
+              break;
+            case 1:
+              cmd = CMD_SWITCH_TO_SCR_MAIN;
+              break;
+            case 2:
+              cmd = CMD_SWITCH_TO_SCR_WIFI_RADIO;
+              break;
+            case 3:
+              cmd = CMD_SWITCH_TO_SCR_SETTINGS;
+              break;
+            }
             break;
           }
+        }
+
+        if (cmd != CMD_NONE)
+        {
+          xQueueSend(appCommandQueue, &cmd, 0);
         }
       }
 
@@ -284,6 +399,7 @@ void encoderTask(void *param)
 void playStartSoundTask(void *param)
 {
   sayHelloBye(1);
+  stop_audio_playback();
   startupDone = true;
   vTaskDelete(NULL); // kill current task
 }
@@ -301,10 +417,6 @@ void uiTask(void *param)
 }
 
 ///////////// RTOS TASKS end /////////////
-
-// LVGL buffer
-static lv_disp_draw_buf_t draw_buf;
-static lv_color_t *buf = NULL;
 
 void display_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p);
 void touchscreen_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data);
@@ -350,10 +462,6 @@ void setup()
   cfg.pin_data = I2S_DATA;
   cfg.copyFrom(info);
   i2s.begin(cfg);
-
-  // a2dp_sink.set_volume(50);
-  // a2dp_sink.set_auto_reconnect(true, 5);
-  // a2dp_sink.start("ESP32 Music");
 
   Serial.printf("Free heap after BT start: %u bytes\n", esp_get_free_heap_size());
 
@@ -418,10 +526,12 @@ void setup()
   menu_screens[1] = objects.wifi_radio_screen;
   menu_screens[2] = objects.equalizer_screen;
   menu_screens[3] = objects.settings_screen;
-
   Serial.println("Focus group ready");
 
-  xTaskCreatePinnedToCore(uiTask, "ui task", 4096, NULL, 1, NULL, 1);
+  // Tasks setup
+  appCommandQueue = xQueueCreate(8, sizeof(AppCommand));
+  xTaskCreatePinnedToCore(appTask, "appTask", 4096, NULL, 2, NULL, 1);
+  xTaskCreatePinnedToCore(uiTask, "uiTask", 4096, NULL, 1, NULL, 1);
 }
 
 void loop()
