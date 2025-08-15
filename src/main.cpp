@@ -12,10 +12,17 @@
 #include "BluetoothA2DPSink.h"
 #include "utilities.h"
 #include "defines.h"
-#include "DisplayDriver.h"
 #include "./ui/ui.h"
 #include "./ui/actions.h"
 
+// the definition is in platformio.ini
+#if defined(USE_ST7735)
+#include "DisplayDrv_st7735.h"
+LGFX_st7735 lcd;
+#else
+#include "DisplayDrv_st7796.h"
+LGFX_st7796 lcd;
+#endif
 
 // GLOBAL VARS AND OBJECTS
 bool startupDone = false;
@@ -32,6 +39,14 @@ enum AppCommand
   CMD_SWITCH_TO_SCR_SETTINGS,
   CMD_BT_RESTART,
   CMD_BT_STOP
+};
+
+// 1 - Hello sound; 0 - Bye sound; 2 - bt pair ready
+enum SoundFile
+{
+  F_BYE_SND,
+  F_HELLO_SND,
+  F_BT_PAIR_SND
 };
 
 QueueHandle_t appCommandQueue; // "transmits" the app commands
@@ -64,9 +79,6 @@ AudioSourceSPIFFS *source = nullptr;
 AudioPlayer *player = nullptr;
 EncodedAudioStream out(&i2s, &helix); // output to decoder
 BluetoothA2DPSink a2dp_sink(i2s);
-
-// Display instance
-LGFX_Display lcd;
 
 // LVGL buffer
 static lv_disp_draw_buf_t draw_buf;
@@ -111,7 +123,7 @@ void printMetaData(MetaDataType type, const char *str, int len)
   Serial.println(str);
 }
 
-void stop_audio_playback() // todo rename - freeI2S
+void freeI2S() // todo rename - freeI2S
 {
   if (player)
   {
@@ -133,7 +145,7 @@ void stop_audio_playback() // todo rename - freeI2S
 }
 
 // 1 - Hello sound; 0 - Bye sound
-void sayHelloBye(bool choice)
+void playMp3File(int choice)
 {
   // Create a new AudioSourceSPIFFS for this file
   source = new AudioSourceSPIFFS("/", ".mp3");
@@ -159,7 +171,7 @@ void switchToScreen(void *screen_ptr)
 // Start BT sink. Call this function when user switches to Bluetooth menu
 void initBtSink()
 {
-  if (btSinkActive )
+  if (btSinkActive)
     return;
 
   Serial.println("Initializing Bluetooth sink...");
@@ -263,8 +275,16 @@ void request_bt_restart()
   xTaskCreatePinnedToCore(restartBtSink, "BT_Restart", 4096, NULL, 1, NULL, 0); // core 0
 }
 
-///////////// RTOS TASKS /////////////
+void playMp3FileTask(void *param)
+{
+  int fileNumber = (int)(intptr_t)param; // cast back to int safely
+  playMp3File(fileNumber);
+  // freeI2S(); // call it from outside
+  vTaskDelete(NULL); // kill current task
+}
 
+///////////// RTOS TASKS /////////////
+// main "flow" and events handling
 void appTask(void *param)
 {
   AppCommand cmd;
@@ -285,6 +305,8 @@ void appTask(void *param)
       case CMD_SWITCH_TO_SCR_BT:
         lv_async_call([](void *unused)
                       {switchToScreen(menu_screens[0]); 
+                        xTaskCreatePinnedToCore(playMp3FileTask, "bt pair snd", 4096, (void *)(intptr_t)F_BT_PAIR_SND, 2, NULL, 1);
+                        freeI2S();
                       initBtSink(); },
                       NULL);
         break;
@@ -321,7 +343,7 @@ void encoderTask(void *param)
     if (isPressed && !longPressTriggered && (millis() - pressStartTime >= ENCODER_BTN_HOLD_TIME))
     {
       // Button held long enough
-      sayHelloBye(0);
+      playMp3File(0); // todo playMp3FileTask(0)
       Serial.println("Long press detected. Shutting down...");
       longPressTriggered = true;
 
@@ -396,14 +418,6 @@ void encoderTask(void *param)
   }
 }
 
-void playStartSoundTask(void *param)
-{
-  sayHelloBye(1);
-  stop_audio_playback();
-  startupDone = true;
-  vTaskDelete(NULL); // kill current task
-}
-
 // LVGL EEZ STUDIO UI loop
 void uiTask(void *param)
 {
@@ -416,7 +430,7 @@ void uiTask(void *param)
   }
 }
 
-///////////// RTOS TASKS end /////////////
+///////////// RTOS TASKS end section /////////////
 
 void display_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p);
 void touchscreen_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data);
@@ -465,11 +479,12 @@ void setup()
 
   Serial.printf("Free heap after BT start: %u bytes\n", esp_get_free_heap_size());
 
-  xTaskCreatePinnedToCore(playStartSoundTask, "start sound", 4096, NULL, 2, NULL, 1);
+  xTaskCreatePinnedToCore(playMp3FileTask, "start sound", 4096, (void *)(intptr_t)F_HELLO_SND, 2, NULL, 1);
 
   // Initialize display
   lcd.init();
   lcd.setBrightness(255); // Set backlight (0-255)
+  lcd.setRotation(0);
   lv_init();
 
   // Initialize display buffer
