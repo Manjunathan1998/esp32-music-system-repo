@@ -12,8 +12,13 @@
 
 #define LGFX_USE_V1 // needed only for lovyanGfx lib
 
+#if defined(USE_ST7735)
+#define TFT_W 160
+#define TFT_H 128
+#else
 #define TFT_W 320
 #define TFT_H 480
+#endif
 
 #define TFT_BL_PIN 23 // display backlight pin
 #define TFT_CS_PIN 15

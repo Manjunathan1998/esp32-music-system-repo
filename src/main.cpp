@@ -484,7 +484,14 @@ void setup()
   // Initialize display
   lcd.init();
   lcd.setBrightness(255); // Set backlight (0-255)
-  lcd.setRotation(0);
+
+  // draw test rectangle
+  lcd.drawRect(0, 0, 20, 10, TFT_RED);
+  lcd.drawRect(140, 0, 20, 10, TFT_RED);
+  lcd.drawRect(0, 118, 20, 10, TFT_RED);
+  lcd.drawRect(140, 118, 20, 10, TFT_RED);
+  vTaskDelay(1000 / portTICK_PERIOD_MS);
+
   lv_init();
 
   // Initialize display buffer
@@ -511,11 +518,11 @@ void setup()
   lv_disp_drv_register(&disp_drv);
 
   // REGISTER TOUCHSCREEN INPUT
-  static lv_indev_drv_t touch_drv;
-  lv_indev_drv_init(&touch_drv);
-  touch_drv.type = LV_INDEV_TYPE_POINTER;
-  touch_drv.read_cb = touchscreen_read;
-  lv_indev_t *touch_indev = lv_indev_drv_register(&touch_drv);
+  // static lv_indev_drv_t touch_drv;
+  // lv_indev_drv_init(&touch_drv);
+  // touch_drv.type = LV_INDEV_TYPE_POINTER;
+  // touch_drv.read_cb = touchscreen_read;
+  // lv_indev_t *touch_indev = lv_indev_drv_register(&touch_drv);
 
   // REGISTER ENCODER AS LVGL INPUT
   static lv_indev_drv_t indev_drv;
@@ -573,18 +580,18 @@ void display_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color
   lv_disp_flush_ready(disp);
 }
 
-void touchscreen_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
-{
-  uint16_t touchX, touchY;
-  bool touched = lcd.getTouch(&touchX, &touchY);
-  if (!touched)
-  {
-    data->state = LV_INDEV_STATE_REL;
-  }
-  else
-  {
-    data->state = LV_INDEV_STATE_PR;
-    data->point.x = touchX;
-    data->point.y = touchY;
-  }
-}
+// void touchscreen_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
+// {
+//   uint16_t touchX, touchY;
+//   bool touched = lcd.getTouch(&touchX, &touchY);
+//   if (!touched)
+//   {
+//     data->state = LV_INDEV_STATE_REL;
+//   }
+//   else
+//   {
+//     data->state = LV_INDEV_STATE_PR;
+//     data->point.x = touchX;
+//     data->point.y = touchY;
+//   }
+// }

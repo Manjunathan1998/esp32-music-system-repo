@@ -14,7 +14,6 @@ typedef struct _objects_t {
     lv_obj_t *equalizer_screen;
     lv_obj_t *settings_screen;
     lv_obj_t *obj0;
-    lv_obj_t *obj1;
     lv_obj_t *bluetooth;
     lv_obj_t *l_bluetooth;
     lv_obj_t *inet_radio;
@@ -24,11 +23,10 @@ typedef struct _objects_t {
     lv_obj_t *settings;
     lv_obj_t *l_settings;
     lv_obj_t *header_container;
+    lv_obj_t *obj1;
     lv_obj_t *obj2;
-    lv_obj_t *obj3;
     lv_obj_t *charge;
-    lv_obj_t *bt_status;
-    lv_obj_t *bt_status_1;
+    lv_obj_t *obj3;
     lv_obj_t *obj4;
     lv_obj_t *obj5;
     lv_obj_t *obj6;
@@ -36,19 +34,6 @@ typedef struct _objects_t {
     lv_obj_t *obj8;
     lv_obj_t *obj9;
     lv_obj_t *obj10;
-    lv_obj_t *obj11;
-    lv_obj_t *obj12;
-    lv_obj_t *obj13;
-    lv_obj_t *obj14;
-    lv_obj_t *obj15;
-    lv_obj_t *obj16;
-    lv_obj_t *obj17;
-    lv_obj_t *obj18;
-    lv_obj_t *obj19;
-    lv_obj_t *obj20;
-    lv_obj_t *obj21;
-    lv_obj_t *obj22;
-    lv_obj_t *obj23;
 } objects_t;
 
 extern objects_t objects;

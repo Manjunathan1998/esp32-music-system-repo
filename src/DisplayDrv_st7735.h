@@ -33,6 +33,7 @@ public:
     cfg.offset_y = 2;
     cfg.offset_rotation = 3;
     cfg.rgb_order = true;
+
     _panel.config(cfg);
 }
 
