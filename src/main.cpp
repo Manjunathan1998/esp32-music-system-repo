@@ -28,6 +28,7 @@ LGFX_st7796 lcd;
 bool startupDone = false;
 bool btSinkActive = false;
 static lv_obj_t *current_screen = NULL;
+const char *batteryCharge = "0";
 
 // All internal commands
 enum AppCommand
@@ -38,7 +39,8 @@ enum AppCommand
   CMD_SWITCH_TO_SCR_WIFI_RADIO,
   CMD_SWITCH_TO_SCR_SETTINGS,
   CMD_BT_RESTART,
-  CMD_BT_STOP
+  CMD_BT_STOP,
+  CMD_BAT_UPDATE
 };
 
 // 1 - Hello sound; 0 - Bye sound; 2 - bt pair ready
@@ -196,41 +198,6 @@ void initBtSink()
   Serial.println("Bluetooth sink init done");
 }
 
-void force_bt_stack_shutdown()
-{
-  Serial.println("Forcefully shutting down Bluetooth stack...");
-
-  esp_err_t err;
-
-  // Disable bluedroid
-  if (esp_bluedroid_get_status() == ESP_BLUEDROID_STATUS_ENABLED)
-  {
-    err = esp_bluedroid_disable();
-    Serial.printf("esp_bluedroid_disable: %s\n", esp_err_to_name(err));
-  }
-
-  // Deinit bluedroid
-  if (esp_bluedroid_get_status() != ESP_BLUEDROID_STATUS_UNINITIALIZED)
-  {
-    err = esp_bluedroid_deinit();
-    Serial.printf("esp_bluedroid_deinit: %s\n", esp_err_to_name(err));
-  }
-
-  // Disable BT controller
-  if (esp_bt_controller_get_status() == ESP_BT_CONTROLLER_STATUS_ENABLED)
-  {
-    err = esp_bt_controller_disable();
-    Serial.printf("esp_bt_controller_disable: %s\n", esp_err_to_name(err));
-  }
-
-  // Deinit BT controller
-  if (esp_bt_controller_get_status() != ESP_BT_CONTROLLER_STATUS_IDLE)
-  {
-    err = esp_bt_controller_deinit();
-    Serial.printf("esp_bt_controller_deinit: %s\n", esp_err_to_name(err));
-  }
-}
-
 void stopBtSink()
 {
   if (!btSinkActive)
@@ -283,6 +250,14 @@ void playMp3FileTask(void *param)
   vTaskDelete(NULL); // kill current task
 }
 
+void updateBatteryCharge()
+{
+  char buffer[10];
+  sprintf(buffer, "%s%%", batteryCharge);
+  lv_label_set_text(objects.charge, buffer);
+  Serial.println("BAT charge updated");
+}
+
 ///////////// RTOS TASKS /////////////
 // main "flow" and events handling
 void appTask(void *param)
@@ -313,6 +288,10 @@ void appTask(void *param)
       case CMD_BT_STOP:
         // todo add bt stop on encoder double click if curr. screen == bt
         Serial.println("Command BT stop");
+        break;
+
+      case CMD_BAT_UPDATE:
+        updateBatteryCharge();
         break;
 
       default:
@@ -427,6 +406,47 @@ void uiTask(void *param)
     lv_timer_handler();
     ui_tick(); // This is important for EEZ-generated UIs
     vTaskDelay(5 / portTICK_PERIOD_MS);
+  }
+}
+
+// parsing commands from serial port. Utility process
+void serialTask(void *param)
+{
+  while (1)
+  {
+    if (Serial.available() > 0)
+    {
+      String input = Serial.readString();
+      input.trim();
+      Serial.println(input);
+
+      // Split at first space
+      int spaceIndex = input.indexOf(' ');
+      String command = "";
+      String value = "0";
+
+      if (spaceIndex > 0)
+      {
+        command = input.substring(0, spaceIndex); // before space
+        value = input.substring(spaceIndex + 1);  // after space
+      }
+      else
+      {
+        command = input; // no value, just a command
+      }
+
+      // Command handling
+      if (command == "bat")
+      {
+        char buf[16]; // make sure it's large enough
+        value.toCharArray(buf, sizeof(buf));
+        batteryCharge = buf;
+        Serial.print("Battery value received: ");
+        Serial.println(value);
+        AppCommand cmd = CMD_BAT_UPDATE;
+        xQueueSend(appCommandQueue, &cmd, 42);
+      }
+    }
   }
 }
 
@@ -554,6 +574,7 @@ void setup()
   appCommandQueue = xQueueCreate(8, sizeof(AppCommand));
   xTaskCreatePinnedToCore(appTask, "appTask", 4096, NULL, 2, NULL, 1);
   xTaskCreatePinnedToCore(uiTask, "uiTask", 4096, NULL, 1, NULL, 1);
+  xTaskCreatePinnedToCore(serialTask, "serialTask", 4096, NULL, 1, NULL, 1);
 }
 
 void loop()

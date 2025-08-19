@@ -186,22 +186,9 @@
               "type": "tabset",
               "id": "EDITORS",
               "weight": 49.934047904456754,
-              "selected": 1,
               "enableDeleteWhenEmpty": false,
               "enableClose": false,
               "children": [
-                {
-                  "type": "tab",
-                  "id": "#d75d48fc-e079-48bd-80e7-e6a1e9bd64f1",
-                  "name": "Settings",
-                  "component": "editor",
-                  "config": {
-                    "objectPath": "[EEZ Studio project_st7735_128x160.eez-project]:/settings",
-                    "subObjectPath": "[EEZ Studio project_st7735_128x160.eez-project]:/settings",
-                    "permanent": false
-                  },
-                  "icon": "material:settings"
-                },
                 {
                   "type": "tab",
                   "id": "#2f247dd5-350d-4142-8c0a-0ce0f3f7d7e2",
