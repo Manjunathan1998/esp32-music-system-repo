@@ -125,7 +125,7 @@ void printMetaData(MetaDataType type, const char *str, int len)
   Serial.println(str);
 }
 
-void freeI2S() // todo rename - freeI2S
+void freeI2S()
 {
   if (player)
   {
@@ -142,11 +142,10 @@ void freeI2S() // todo rename - freeI2S
 
   i2s.flush(); // Flush pending audio frames (safe if I2S is still active)
   i2s.end();
-  vTaskDelay(100 / portTICK_PERIOD_MS);
-  Serial.println("Audio playback stopped, resources freed.");
+  vTaskDelay(600 / portTICK_PERIOD_MS);
+  Serial.println("I2S resources freed..maybe");
 }
 
-// 1 - Hello sound; 0 - Bye sound
 void playMp3File(int choice)
 {
   // Create a new AudioSourceSPIFFS for this file
@@ -154,13 +153,31 @@ void playMp3File(int choice)
   player = new AudioPlayer(*source, i2s, helix);
   player->setMetadataCallback(printMetaData);
 
-  if (!player->begin(choice)) //  hello.mp3 or bye.mp3
+  // Configure I2S for file playback
+  auto cfg = i2s.defaultConfig(TX_MODE);
+  cfg.pin_bck = I2S_BCK;
+  cfg.pin_ws = I2S_WS;
+  cfg.pin_data = I2S_DATA;
+  i2s.begin(cfg);
+
+  if (!player->begin(choice))
   {
     Serial.println("Failed to start player");
+    // Cleanup
+    i2s.end();
+    delete player;
+    player = nullptr;
+    delete source;
+    source = nullptr;
+
     return;
   }
 
   player->copyAll();
+  freeI2S();
+
+  // Small settle time
+  vTaskDelay(200 / portTICK_PERIOD_MS);
 }
 
 void switchToScreen(void *screen_ptr)
@@ -246,7 +263,6 @@ void playMp3FileTask(void *param)
 {
   int fileNumber = (int)(intptr_t)param; // cast back to int safely
   playMp3File(fileNumber);
-  // freeI2S(); // call it from outside
   vTaskDelete(NULL); // kill current task
 }
 
@@ -256,6 +272,17 @@ void updateBatteryCharge()
   sprintf(buffer, "%s%%", batteryCharge);
   lv_label_set_text(objects.charge, buffer);
   Serial.println("BAT charge updated");
+}
+
+void nvsInit()
+{
+  esp_err_t ret = nvs_flash_init();
+  if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
+  {
+    ESP_ERROR_CHECK(nvs_flash_erase());
+    ret = nvs_flash_init();
+  }
+  ESP_ERROR_CHECK(ret);
 }
 
 ///////////// RTOS TASKS /////////////
@@ -280,8 +307,10 @@ void appTask(void *param)
       case CMD_SWITCH_TO_SCR_BT:
         lv_async_call([](void *unused)
                       {switchToScreen(menu_screens[0]); 
-                        xTaskCreatePinnedToCore(playMp3FileTask, "bt pair snd", 4096, (void *)(intptr_t)F_BT_PAIR_SND, 2, NULL, 1);
+                        // xTaskCreatePinnedToCore(playMp3FileTask, "bt pair snd", 4096, (void *)(intptr_t)F_BT_PAIR_SND, 2, NULL, 1);
+                        playMp3File(F_BT_PAIR_SND);
                         freeI2S();
+                        vTaskDelay(1000 / portTICK_PERIOD_MS);
                       initBtSink(); },
                       NULL);
         break;
@@ -457,6 +486,8 @@ void touchscreen_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data);
 
 void setup()
 {
+  // nvsInit();
+
   Serial.begin(115200);
 
   if (!SPIFFS.begin(true))
