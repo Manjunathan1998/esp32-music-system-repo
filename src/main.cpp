@@ -83,8 +83,13 @@ EncodedAudioStream out(&i2s, &helix); // output to decoder
 BluetoothA2DPSink a2dp_sink(i2s);
 
 // LVGL buffer
+#if defined(NO_PSRAM)
+static lv_color_t buf[TFT_W * 10]; // Single buffer: only 10 lines
+#else
+static lv_color_t *buf = NULL; // works with external SRAM
+#endif
+
 static lv_disp_draw_buf_t draw_buf;
-static lv_color_t *buf = NULL;
 
 // LVGL input device callback. Allows to use encoder in lvgl UI
 void encoderReadCb(lv_indev_drv_t *drv, lv_indev_data_t *data)
@@ -482,13 +487,17 @@ void setup()
   lcd.drawRect(140, 0, 20, 10, TFT_RED);
   lcd.drawRect(0, 118, 20, 10, TFT_RED);
   lcd.drawRect(140, 118, 20, 10, TFT_RED);
-  vTaskDelay(1000 / portTICK_PERIOD_MS);
+  vTaskDelay(500 / portTICK_PERIOD_MS);
 
   lv_init();
 
-  // Initialize display buffer
+// Initialize display buffer
+#if defined(NO_PSRAM)
+  lv_disp_draw_buf_init(&draw_buf, buf, NULL, TFT_W * 10);
+#else
   buf = (lv_color_t *)heap_caps_malloc(TFT_W * 40 * sizeof(lv_color_t),
                                        MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+#endif
 
   // Check buffer allocation
   if (!buf)
@@ -498,7 +507,7 @@ void setup()
       delay(1000);
   }
 
-  lv_disp_draw_buf_init(&draw_buf, buf, NULL, TFT_W * 40);
+  // lv_disp_draw_buf_init(&draw_buf, buf, NULL, TFT_W * 40);
 
   // Initialize display driver
   static lv_disp_drv_t disp_drv;
