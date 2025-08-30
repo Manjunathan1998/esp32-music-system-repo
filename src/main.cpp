@@ -37,6 +37,7 @@ enum AppCommand
   CMD_SWITCH_TO_SCR_MAIN,
   CMD_SWITCH_TO_SCR_BT,
   CMD_SWITCH_TO_SCR_WIFI_RADIO,
+  CMD_SWITCH_TO_SCR_EQ,
   CMD_SWITCH_TO_SCR_SETTINGS,
   CMD_BT_RESTART,
   CMD_BT_STOP,
@@ -262,6 +263,21 @@ void appTask(void *param)
                       initBtSink(); },
                       NULL);
         break;
+      case CMD_SWITCH_TO_SCR_WIFI_RADIO:
+        lv_async_call([](void *unused)
+                      { switchToScreen(menu_screens[1]); },
+                      NULL);
+        break;
+      case CMD_SWITCH_TO_SCR_EQ:
+        lv_async_call([](void *unused)
+                      { switchToScreen(menu_screens[2]); },
+                      NULL);
+        break;
+      case CMD_SWITCH_TO_SCR_SETTINGS:
+        lv_async_call([](void *unused)
+                      { switchToScreen(menu_screens[3]); },
+                      NULL);
+        break;
       case CMD_BT_STOP:
         // todo add bt stop on encoder double click if curr. screen == bt
         Serial.println("Command BT stop");
@@ -297,11 +313,10 @@ void encoderTask(void *param)
     }
 
     // Button held long enough
-    if (isPressed && /*!longPressTriggered && */ (millis() - pressStartTime >= ENCODER_BTN_HOLD_TIME))
+    if (isPressed && (millis() - pressStartTime >= ENCODER_BTN_HOLD_TIME))
     {
       playMp3File(0); // todo playMp3FileTask(0)
-      Serial.println("Long press detected. Shutting down...");
-      // longPressTriggered = true;
+      Serial.println("Long press, shutting down...");
 
       vTaskDelay(100 / portTICK_PERIOD_MS); // allow Serial flush
       esp_deep_sleep_start();
@@ -309,17 +324,13 @@ void encoderTask(void *param)
 
     if (button.rose())
     {
-      // Button just released
-      Serial.println("Button released");
-      // if (!longPressTriggered)
-      // {
       unsigned long now = millis();
       Serial.println("Short press");
 
-      // Double Click, if waiting less than doubleClickThreshold,
-      // switch to the main screen
+      // Detect double click, if waiting less than "doubleClickThreshold",
       if (waitingForSecondClick && (now - lastClickTime < doubleClickThreshold))
       {
+        // switch to the main screen
         AppCommand cmd = CMD_SWITCH_TO_SCR_MAIN;
         xQueueSend(appCommandQueue, &cmd, 0);
         waitingForSecondClick = false;
@@ -329,8 +340,6 @@ void encoderTask(void *param)
         waitingForSecondClick = true;
         lastClickTime = now;
       }
-      // }
-
       isPressed = false;
     }
 
@@ -356,7 +365,7 @@ void encoderTask(void *param)
               Serial.println("CMD_SWITCH_TO_SCR_WIFI");
               break;
             case 2:
-              cmd = CMD_SWITCH_TO_SCR_SETTINGS;
+              cmd = CMD_SWITCH_TO_SCR_EQ;
               Serial.println("CMD_SWITCH_TO_SCR_EQ");
               break;
             case 3:
@@ -388,7 +397,7 @@ void uiTask(void *param)
   while (1)
   {
     lv_timer_handler();
-    ui_tick(); // This is important for EEZ-generated UIs
+    ui_tick(); // This is important for EEZ-generated UI
     vTaskDelay(5 / portTICK_PERIOD_MS);
   }
 }
