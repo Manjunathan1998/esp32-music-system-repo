@@ -293,15 +293,15 @@ void encoderTask(void *param)
       // Button just pressed
       pressStartTime = millis();
       isPressed = true;
-      longPressTriggered = false;
+      // longPressTriggered = false;
     }
 
-    if (isPressed && !longPressTriggered && (millis() - pressStartTime >= ENCODER_BTN_HOLD_TIME))
+    // Button held long enough
+    if (isPressed && /*!longPressTriggered && */ (millis() - pressStartTime >= ENCODER_BTN_HOLD_TIME))
     {
-      // Button held long enough
       playMp3File(0); // todo playMp3FileTask(0)
       Serial.println("Long press detected. Shutting down...");
-      longPressTriggered = true;
+      // longPressTriggered = true;
 
       vTaskDelay(100 / portTICK_PERIOD_MS); // allow Serial flush
       esp_deep_sleep_start();
@@ -310,23 +310,26 @@ void encoderTask(void *param)
     if (button.rose())
     {
       // Button just released
-      if (!longPressTriggered)
-      {
-        unsigned long now = millis();
+      Serial.println("Button released");
+      // if (!longPressTriggered)
+      // {
+      unsigned long now = millis();
+      Serial.println("Short press");
 
-        // Double Click, switch back to the main screen
-        if (waitingForSecondClick && (now - lastClickTime < doubleClickThreshold))
-        {
-          AppCommand cmd = CMD_SWITCH_TO_SCR_MAIN;
-          xQueueSend(appCommandQueue, &cmd, 0);
-          waitingForSecondClick = false;
-        }
-        else
-        {
-          waitingForSecondClick = true;
-          lastClickTime = now;
-        }
+      // Double Click, if waiting less than doubleClickThreshold,
+      // switch to the main screen
+      if (waitingForSecondClick && (now - lastClickTime < doubleClickThreshold))
+      {
+        AppCommand cmd = CMD_SWITCH_TO_SCR_MAIN;
+        xQueueSend(appCommandQueue, &cmd, 0);
+        waitingForSecondClick = false;
       }
+      else
+      {
+        waitingForSecondClick = true;
+        lastClickTime = now;
+      }
+      // }
 
       isPressed = false;
     }
@@ -346,15 +349,19 @@ void encoderTask(void *param)
             {
             case 0:
               cmd = CMD_SWITCH_TO_SCR_BT;
+              Serial.println("CMD_SWITCH_TO_SCR_BT");
               break;
             case 1:
-              cmd = CMD_SWITCH_TO_SCR_MAIN;
+              cmd = CMD_SWITCH_TO_SCR_WIFI_RADIO;
+              Serial.println("CMD_SWITCH_TO_SCR_WIFI");
               break;
             case 2:
-              cmd = CMD_SWITCH_TO_SCR_WIFI_RADIO;
+              cmd = CMD_SWITCH_TO_SCR_SETTINGS;
+              Serial.println("CMD_SWITCH_TO_SCR_EQ");
               break;
             case 3:
               cmd = CMD_SWITCH_TO_SCR_SETTINGS;
+              Serial.println("CMD_SWITCH_TO_SCR_SETTINGS");
               break;
             }
             break;
@@ -495,8 +502,10 @@ void setup()
 #if defined(NO_PSRAM)
   lv_disp_draw_buf_init(&draw_buf, buf, NULL, TFT_W * 10);
 #else
+  Serial.println("SRAM buf setup");
   buf = (lv_color_t *)heap_caps_malloc(TFT_W * 40 * sizeof(lv_color_t),
                                        MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  lv_disp_draw_buf_init(&draw_buf, buf, NULL, TFT_W * 40);
 #endif
 
   // Check buffer allocation
@@ -506,8 +515,6 @@ void setup()
     while (1)
       delay(1000);
   }
-
-  // lv_disp_draw_buf_init(&draw_buf, buf, NULL, TFT_W * 40);
 
   // Initialize display driver
   static lv_disp_drv_t disp_drv;
@@ -554,7 +561,7 @@ void setup()
   // Tasks setup
   appCommandQueue = xQueueCreate(8, sizeof(AppCommand));
   xTaskCreatePinnedToCore(appTask, "appTask", 4096, NULL, 2, NULL, 1);
-  xTaskCreatePinnedToCore(uiTask, "uiTask", 4096, NULL, 1, NULL, 1);
+  xTaskCreatePinnedToCore(uiTask, "uiTask", 8096, NULL, 1, NULL, 1);
   xTaskCreatePinnedToCore(serialTask, "serialTask", 4096, NULL, 1, NULL, 1);
 }
 
