@@ -1,6 +1,6 @@
 {
   "navigation": {
-    "selectedUserPageObject": "[EEZ Studio project_st7735_128x160.eez-project]:/userPages/0",
+    "selectedUserPageObject": "[EEZ Studio project_st7735_128x160.eez-project]:/userPages/3",
     "subnavigationSelectedItems": {}
   },
   "layoutModel": {
@@ -192,10 +192,10 @@
                 {
                   "type": "tab",
                   "id": "#2f247dd5-350d-4142-8c0a-0ce0f3f7d7e2",
-                  "name": "Main",
+                  "name": "Equalizer_Screen",
                   "component": "editor",
                   "config": {
-                    "objectPath": "[EEZ Studio project_st7735_128x160.eez-project]:/userPages/0",
+                    "objectPath": "[EEZ Studio project_st7735_128x160.eez-project]:/userPages/3",
                     "permanent": false
                   },
                   "icon": "svg:page"
@@ -1039,7 +1039,9 @@
       "selection": {
         "0": {
           "0": {},
-          "1": {}
+          "1": {
+            "$selected": true
+          }
         }
       },
       "transform": {

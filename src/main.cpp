@@ -390,7 +390,9 @@ void encoderTask(void *param)
   }
 }
 
-// LVGL EEZ STUDIO UI loop
+/* LVGL EEZ STUDIO UI
+ * should not be changed
+ */
 void uiTask(void *param)
 {
   Serial.println("--> UI loop task start");
