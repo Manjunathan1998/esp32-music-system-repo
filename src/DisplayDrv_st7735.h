@@ -1,7 +1,7 @@
 #pragma once
 
 #include <LovyanGFX.hpp>
-#include "defines.h"
+#include "globals.h"
 
 class LGFX_st7735 : public lgfx::LGFX_Device
 {
@@ -10,8 +10,8 @@ public:
         {{auto cfg = _bus.config();
     // SPI pins
     cfg.spi_host = HSPI_HOST;
-    cfg.pin_sclk = TFT_SCLK_PIN;
-    cfg.pin_mosi = TFT_MOSI_PIN;
+    cfg.pin_sclk = TFT_SCLK_PIN; // jtag 14
+    cfg.pin_mosi = TFT_MOSI_PIN; // jtag tck 13
     cfg.pin_miso = TFT_MISO_PIN; // unused
     cfg.pin_dc = TFT_DC_PIN;
     cfg.freq_write = 60000000;
@@ -22,7 +22,7 @@ public:
 // Panel configuration
 {
     auto cfg = _panel.config();
-    cfg.pin_cs = TFT_CS_PIN;
+    cfg.pin_cs = TFT_CS_PIN; // jtag tdo 15
     cfg.pin_rst = TFT_RST_PIN;
     cfg.pin_busy = -1; // Busy (-1 = unused)
 

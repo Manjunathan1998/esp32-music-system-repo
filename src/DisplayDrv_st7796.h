@@ -1,7 +1,7 @@
 #pragma once
 
 #include <LovyanGFX.hpp>
-#include "defines.h"
+#include "globals.h"
 
 class LGFX_st7796 : public lgfx::LGFX_Device
 {

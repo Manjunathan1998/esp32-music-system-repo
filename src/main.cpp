@@ -1,17 +1,9 @@
 #include <Arduino.h>
-#include <lvgl.h>
-#include <LovyanGFX.hpp>
-#include <Bounce2.h>
-#include <ESP32Encoder.h>
-#include "AudioTools.h"
-#include "AudioTools/Disk/AudioSourceSPIFFS.h"
-#include "AudioTools/AudioCodecs/CodecMP3Helix.h"
-#include "driver/i2s.h"
+#include "globals.h"
 #include "esp_bt.h"
 
 #include "BluetoothA2DPSink.h"
 #include "utilities.h"
-#include "defines.h"
 #include "./ui/ui.h"
 #include "./ui/actions.h"
 
@@ -24,62 +16,14 @@ LGFX_st7735 lcd;
 LGFX_st7796 lcd;
 #endif
 
-// GLOBAL VARS AND OBJECTS
-bool startupDone = false;
-bool btSinkActive = false;
-static lv_obj_t *current_screen = NULL;
-const char *batteryCharge = "0";
-
-// All internal commands
-enum AppCommand
-{
-  CMD_NONE,
-  CMD_SWITCH_TO_SCR_MAIN,
-  CMD_SWITCH_TO_SCR_BT,
-  CMD_SWITCH_TO_SCR_WIFI_RADIO,
-  CMD_SWITCH_TO_SCR_EQ,
-  CMD_SWITCH_TO_SCR_SETTINGS,
-  CMD_BT_RESTART,
-  CMD_BT_STOP,
-  CMD_BAT_UPDATE
-};
-
-// 1 - Hello sound; 0 - Bye sound; 2 - bt pair ready
-enum SoundFile
-{
-  F_BYE_SND,
-  F_HELLO_SND,
-  F_BT_PAIR_SND
-};
-
-QueueHandle_t appCommandQueue; // "transmits" the app commands
-
-// Encoder variables
-ESP32Encoder encoder;
-volatile int64_t encoderPos = 0;
-lv_indev_t *enc_indev;
-lv_group_t *focus_group;
-lv_obj_t *menu_buttons[4];
-lv_obj_t *menu_screens[4];
-
-// Button variables
-Bounce button = Bounce();
-unsigned long pressStartTime = 0;
-bool isPressed = false;
-bool longPressTriggered = false;
-unsigned long lastClickTime = 0;
-bool firstClickDetected = false;
-const unsigned long doubleClickThreshold = 600; // ms
-bool waitingForSecondClick = false;
-
 // Audio objects
 AudioInfo info(44100, 2, 16);
 I2SStream i2s;
 
 // mp3 startup sound setup
 MP3DecoderHelix helix;
-AudioSourceSPIFFS *source = nullptr;
-AudioPlayer *player = nullptr;
+AudioSourceSPIFFS source("/", ".mp3");
+AudioPlayer player(source, i2s, helix);
 EncodedAudioStream out(&i2s, &helix); // output to decoder
 BluetoothA2DPSink a2dp_sink(i2s);
 
@@ -92,6 +36,15 @@ static lv_color_t *buf = NULL; // works with external SRAM
 
 static lv_disp_draw_buf_t draw_buf;
 
+void drawTestScreen()
+{
+  // draw test rectangle
+  lcd.drawRect(0, 0, 20, 10, TFT_RED);
+  lcd.drawRect(140, 0, 20, 10, TFT_RED);
+  lcd.drawRect(0, 118, 20, 10, TFT_RED);
+  lcd.drawRect(140, 118, 20, 10, TFT_RED);
+  vTaskDelay(500 / portTICK_PERIOD_MS);
+}
 // LVGL input device callback. Allows to use encoder in lvgl UI
 void encoderReadCb(lv_indev_drv_t *drv, lv_indev_data_t *data)
 {
@@ -131,42 +84,22 @@ void printMetaData(MetaDataType type, const char *str, int len)
   Serial.println(str);
 }
 
-void freeI2S()
-{
-  if (player)
-  {
-    player->end();
-    delete player;
-    player = nullptr;
-  }
-
-  if (source)
-  {
-    delete source;
-    source = nullptr;
-  }
-
-  i2s.flush(); // Flush pending audio frames (safe if I2S is still active)
-  i2s.end();
-  vTaskDelay(600 / portTICK_PERIOD_MS);
-  Serial.println("I2S resources freed..maybe");
-}
-
 void playMp3File(int choice)
 {
-  Serial.println("Init new player");
-  // Create a new AudioSourceSPIFFS for this file
-  source = new AudioSourceSPIFFS("/", ".mp3");
-  player = new AudioPlayer(*source, i2s, helix);
-  player->setMetadataCallback(printMetaData);
+  if (!cbSet)
+  {
 
-  if (!player->begin(choice))
+    Serial.println("Init new player");
+    player.setMetadataCallback(printMetaData);
+    cbSet = true;
+  }
+  if (!player.begin(choice))
   {
     Serial.println("Failed to start player");
     return;
   }
 
-  player->copyAll();
+  player.copyAll();
 }
 
 void switchToScreen(void *screen_ptr)
@@ -177,17 +110,19 @@ void switchToScreen(void *screen_ptr)
 }
 
 // Start BT sink. Call this function when user switches to Bluetooth menu
-void initBtSink()
+void startBtSink()
 {
   if (btSinkActive)
+  {
+    Serial.println("Bluetooth sink already active, returning...");
     return;
+  }
 
   Serial.println("Initializing Bluetooth sink...");
 
-  // a2dp_sink = new BluetoothA2DPSink(i2s);
-
   if (!i2s.isActive())
   {
+    Serial.println("i2s is not active, activating");
     auto cfg = i2s.defaultConfig(TX_MODE);
     cfg.pin_bck = I2S_BCK;
     cfg.pin_ws = I2S_WS;
@@ -196,10 +131,9 @@ void initBtSink()
     i2s.begin(cfg);
   }
 
-  a2dp_sink.set_volume(50);              // Optional: set initial volume
+  // a2dp_sink.set_volume(50);              // Optional: set initial volume
   a2dp_sink.set_auto_reconnect(true, 5); // Auto reconnect if disconnected
   a2dp_sink.start("ESP32 Music");        // Advertise device name
-
   btSinkActive = true;
   Serial.println("Bluetooth sink init done");
 }
@@ -212,11 +146,9 @@ void stopBtSink()
   Serial.println("Stopping A2DP sink...");
   a2dp_sink.disconnect();
   vTaskDelay(600 / portTICK_PERIOD_MS);
-  a2dp_sink.end();
-  vTaskDelay(1600 / portTICK_PERIOD_MS);
 
-  Serial.println("Sink stopped");
   btSinkActive = false;
+  Serial.println("BT disconnected");
 }
 
 void playMp3FileTask(void *param)
@@ -235,6 +167,18 @@ void updateBatteryCharge()
 }
 
 ///////////// RTOS TASKS /////////////
+
+void btInitTask(void *param)
+{
+  // playMp3File(2);
+  // player.end();
+  // i2s.end();
+  // vTaskDelay(600 / portTICK_PERIOD_MS);
+  startBtSink();
+  vTaskDelay(1000 / portTICK_PERIOD_MS);
+  return;
+}
+
 // main "flow" and events handling
 void appTask(void *param)
 {
@@ -255,14 +199,12 @@ void appTask(void *param)
 
       case CMD_SWITCH_TO_SCR_BT:
         lv_async_call([](void *unused)
-                      {
-                        switchToScreen(menu_screens[0]); 
-                        // xTaskCreatePinnedToCore(playMp3FileTask, "bt pair snd", 4096, (void *)(intptr_t)F_BT_PAIR_SND, 2, NULL, 1);
-                        freeI2S();
-                        vTaskDelay(600 / portTICK_PERIOD_MS);
-                      initBtSink(); },
-                      NULL);
+                      { switchToScreen(menu_screens[0]); }, NULL);
+
+        // xTaskCreatePinnedToCore(btInitTask, "btInitTask", 8096, NULL, 1, NULL, 1);
+        startBtSink();
         break;
+
       case CMD_SWITCH_TO_SCR_WIFI_RADIO:
         lv_async_call([](void *unused)
                       { switchToScreen(menu_screens[1]); },
@@ -400,7 +342,7 @@ void uiTask(void *param)
   {
     lv_timer_handler();
     ui_tick(); // This is important for EEZ-generated UI
-    vTaskDelay(5 / portTICK_PERIOD_MS);
+    vTaskDelay(10 / portTICK_PERIOD_MS);
   }
 }
 
@@ -450,9 +392,23 @@ void serialTask(void *param)
 void display_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p);
 void touchscreen_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data);
 
+//////////////////////////////////////////////// SETUP //////////////////////////////////////////////////////
 void setup()
 {
   Serial.begin(115200);
+
+  // I2S and audio setup
+  // todo maybe incapsulate to a function
+  Serial.printf("Free heap before i2s begin: %u bytes\n", esp_get_free_heap_size());
+  AudioToolsLogger.begin(Serial, AudioToolsLogLevel::Info);
+  Serial.println("Starting I2S...");
+  auto cfg = i2s.defaultConfig(TX_MODE);
+  cfg.copyFrom(info);
+  cfg.buffer_count = 4;
+  cfg.buffer_size = 64;
+
+  i2s.begin(cfg);
+  Serial.printf("Free heap after i2s begin: %u bytes\n", esp_get_free_heap_size());
 
   if (!SPIFFS.begin(true))
   {
@@ -480,32 +436,13 @@ void setup()
   button.interval(10);
   Serial.println("Encoder initialized");
 
-  Serial.printf("Free heap before BT start: %u bytes\n", esp_get_free_heap_size());
-
-  // I2S and audio setup
-  AudioToolsLogger.begin(Serial, AudioToolsLogLevel::Info);
-  Serial.println("Starting I2S...");
-  auto cfg = i2s.defaultConfig(TX_MODE);
-  cfg.pin_bck = I2S_BCK;
-  cfg.pin_ws = I2S_WS;
-  cfg.pin_data = I2S_DATA;
-  cfg.copyFrom(info);
-  i2s.begin(cfg);
-
-  Serial.printf("Free heap after BT start: %u bytes\n", esp_get_free_heap_size());
-
-  xTaskCreatePinnedToCore(playMp3FileTask, "start sound", 4096, (void *)(intptr_t)F_HELLO_SND, 2, NULL, 1);
+  // xTaskCreatePinnedToCore(playMp3FileTask, "start sound", 4096, (void *)(intptr_t)F_HELLO_SND, 2, NULL, 1);
 
   // Initialize display
   lcd.init();
   lcd.setBrightness(255); // Set backlight (0-255)
 
-  // draw test rectangle
-  lcd.drawRect(0, 0, 20, 10, TFT_RED);
-  lcd.drawRect(140, 0, 20, 10, TFT_RED);
-  lcd.drawRect(0, 118, 20, 10, TFT_RED);
-  lcd.drawRect(140, 118, 20, 10, TFT_RED);
-  vTaskDelay(500 / portTICK_PERIOD_MS);
+  drawTestScreen();
 
   lv_init();
 
@@ -514,9 +451,9 @@ void setup()
   lv_disp_draw_buf_init(&draw_buf, buf, NULL, TFT_W * 10);
 #else
   Serial.println("SRAM buf setup");
-  buf = (lv_color_t *)heap_caps_malloc(TFT_W * 40 * sizeof(lv_color_t),
+  buf = (lv_color_t *)heap_caps_malloc(TFT_W * 20 * sizeof(lv_color_t),
                                        MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-  lv_disp_draw_buf_init(&draw_buf, buf, NULL, TFT_W * 40);
+  lv_disp_draw_buf_init(&draw_buf, buf, NULL, TFT_W * 20);
 #endif
 
   // Check buffer allocation
@@ -569,11 +506,12 @@ void setup()
   menu_screens[3] = objects.settings_screen;
   Serial.println("Focus group ready");
 
-  // Tasks setup
+  // RTOS Tasks setup
   appCommandQueue = xQueueCreate(8, sizeof(AppCommand));
-  xTaskCreatePinnedToCore(appTask, "appTask", 4096, NULL, 2, NULL, 1);
-  xTaskCreatePinnedToCore(uiTask, "uiTask", 8096, NULL, 1, NULL, 1);
+  xTaskCreatePinnedToCore(appTask, "appTask", 8096, NULL, 2, NULL, 1);
+  xTaskCreatePinnedToCore(uiTask, "uiTask", 4096, NULL, 1, NULL, 1);
   xTaskCreatePinnedToCore(serialTask, "serialTask", 4096, NULL, 1, NULL, 1);
+  // xTaskCreatePinnedToCore(btInitTask, "btInitTask", 8096, NULL, 1, NULL, 1);
 }
 
 void loop()
