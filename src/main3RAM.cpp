@@ -7,6 +7,8 @@
 #include "./ui/ui.h"
 #include "./ui/actions.h"
 
+#include "esp_heap_caps.h"
+
 // the definition is in platformio.ini
 #if defined(USE_ST7735)
 #include "DisplayDrv_st7735.h"
@@ -223,69 +225,7 @@ void appTask(void *param)
 	}
 }
 
-// void appTask(void *param)
-// {
-// 	while (1)
-// 	{
-// 		playMp3File(1); // start sound
-// 		vTaskDelay(600 / portTICK_PERIOD_MS);
-// 		playMp3File(2); // bt pair sound
-// 		i2s.end();
-// 		vTaskDelay(600 / portTICK_PERIOD_MS);
-
-// 		startBtSink();
-// 		vTaskDelay(15000 / portTICK_PERIOD_MS); // 15 sec
-
-// 		stopBtSink();
-// 		vTaskDelay(600 / portTICK_PERIOD_MS);
-
-// 		playMp3File(0); // bye sound
-// 	}
-// }
-
 // parsing commands from serial port. Utility process
-void serialTask(void *param)
-{
-	while (1)
-	{
-		vTaskDelay(100 / portTICK_PERIOD_MS);
-		// if (Serial.available() > 0)
-		// {
-		// 	String input = Serial.readString();
-		// 	input.trim();
-		// 	Serial.println("input");
-
-		// 	Serial.println(input);
-		// 	// Split at first space
-		// 	int spaceIndex = input.indexOf(' ');
-		// 	String command = "";
-		// 	String cmdValue = "0";
-
-		// 	if (spaceIndex > 0)
-		// 	{
-		// 		command = input.substring(0, spaceIndex);	// before space
-		// 		cmdValue = input.substring(spaceIndex + 1); // after space
-		// 	}
-		// 	else
-		// 	{
-		// 		command = input; // no value, just a command
-		// 	}
-
-		// 	// Command handling
-		// 	if (command == "bat")
-		// 	{
-		// 		// char buf[16]; // make sure it's large enough
-		// 		// cmdValue.toCharArray(buf, sizeof(buf));
-		// 		batteryCharge = cmdValue;
-		// 		Serial.print("Battery value received: ");
-		// 		Serial.println(cmdValue);
-		// 		AppCommand cmd = CMD_BAT_UPDATE;
-		// 		xQueueSend(appCommandQueue, &cmd, 42);
-		// 	}
-		// }
-	}
-}
-
 void serialTask(void *param)
 {
 	while (1)
@@ -298,6 +238,32 @@ void serialTask(void *param)
 			Serial.println("input");
 
 			Serial.println(input);
+			// 	// Split at first space
+			int spaceIndex = input.indexOf(' ');
+			String command = "";
+			String cmdValue = "0";
+
+			if (spaceIndex > 0)
+			{
+				command = input.substring(0, spaceIndex);	// before space
+				cmdValue = input.substring(spaceIndex + 1); // after space
+			}
+			else
+			{
+				command = input; // no value, just a command
+			}
+
+			// Command handling
+			if (command == "bat")
+			{
+				// char buf[16]; // make sure it's large enough
+				// cmdValue.toCharArray(buf, sizeof(buf));
+				batteryCharge = cmdValue;
+				Serial.print("Battery value received: ");
+				Serial.println(cmdValue);
+				AppCommand cmd = CMD_BAT_UPDATE;
+				xQueueSend(appCommandQueue, &cmd, 42);
+			}
 		}
 	}
 }
@@ -520,7 +486,6 @@ void setup()
 	xTaskCreatePinnedToCore(encoderTask, "EncoderTask", 4096, NULL, 1, NULL, 1);
 	xTaskCreatePinnedToCore(appTask, "appTask", 3072, NULL, 3, NULL, 1); // 3rd arg matters a lot, maybe find out optimal
 	xTaskCreatePinnedToCore(serialTask, "serialTask", 1536, NULL, 1, NULL, 1);
-	xTaskCreatePinnedToCore(serialTask2, "serialTask2", 1536, NULL, 1, NULL, 1);
 }
 
 void loop()
