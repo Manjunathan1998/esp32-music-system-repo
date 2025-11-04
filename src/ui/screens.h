@@ -10,30 +10,50 @@ extern "C" {
 typedef struct _objects_t {
     lv_obj_t *main;
     lv_obj_t *bt_screen;
-    lv_obj_t *wifi_radio_screen;
-    lv_obj_t *equalizer_screen;
-    lv_obj_t *settings_screen;
-    lv_obj_t *obj0;
-    lv_obj_t *bluetooth;
-    lv_obj_t *l_bluetooth;
-    lv_obj_t *inet_radio;
-    lv_obj_t *l_inet_radio;
+    lv_obj_t *aws_connect;
+    lv_obj_t *equalizer_page;
+    lv_obj_t *settings_page;
+    lv_obj_t *main_list_holder;
+    lv_obj_t *a2dp_bluetooth;
+    lv_obj_t *l_a2dp;
+    lv_obj_t *aws_sync;
+    lv_obj_t *l_aws;
     lv_obj_t *equalizer;
-    lv_obj_t *l_qualizer;
+    lv_obj_t *l_eq;
     lv_obj_t *settings;
     lv_obj_t *l_settings;
-    lv_obj_t *header_container;
-    lv_obj_t *obj1;
-    lv_obj_t *obj2;
-    lv_obj_t *charge;
-    lv_obj_t *obj3;
-    lv_obj_t *obj4;
-    lv_obj_t *obj5;
-    lv_obj_t *obj6;
-    lv_obj_t *obj7;
-    lv_obj_t *obj8;
-    lv_obj_t *obj9;
-    lv_obj_t *obj10;
+    lv_obj_t *battery_skeleton;
+    lv_obj_t *ions_left_20;
+    lv_obj_t *ions_left_60;
+    lv_obj_t *ions_left_60_above;
+    lv_obj_t *bluetooth_panel_container;
+    lv_obj_t *bluetooth_panel;
+    lv_obj_t *artist_name;
+    lv_obj_t *track_name_1;
+    lv_obj_t *status_;
+    lv_obj_t *track_name_2;
+    lv_obj_t *battery_skeleton_1;
+    lv_obj_t *ions_left_21;
+    lv_obj_t *ions_left_61;
+    lv_obj_t *ions_left_62;
+    lv_obj_t *aws_panel_container;
+    lv_obj_t *aws_panel_1;
+    lv_obj_t *battery_skeleton_2;
+    lv_obj_t *ions_left_22;
+    lv_obj_t *ions_left_63;
+    lv_obj_t *ions_left_64;
+    lv_obj_t *eq_panel_container;
+    lv_obj_t *eq_panel;
+    lv_obj_t *battery_skeleton_3;
+    lv_obj_t *ions_left_69;
+    lv_obj_t *ions_left_23;
+    lv_obj_t *ions_left_65;
+    lv_obj_t *settings_container;
+    lv_obj_t *settings_panel;
+    lv_obj_t *battery_skeleton_4;
+    lv_obj_t *ions_left_24;
+    lv_obj_t *ions_left_67;
+    lv_obj_t *ions_left_68;
 } objects_t;
 
 extern objects_t objects;
@@ -41,9 +61,9 @@ extern objects_t objects;
 enum ScreensEnum {
     SCREEN_ID_MAIN = 1,
     SCREEN_ID_BT_SCREEN = 2,
-    SCREEN_ID_WIFI_RADIO_SCREEN = 3,
-    SCREEN_ID_EQUALIZER_SCREEN = 4,
-    SCREEN_ID_SETTINGS_SCREEN = 5,
+    SCREEN_ID_AWS_CONNECT = 3,
+    SCREEN_ID_EQUALIZER_PAGE = 4,
+    SCREEN_ID_SETTINGS_PAGE = 5,
 };
 
 void create_screen_main();
@@ -52,14 +72,14 @@ void tick_screen_main();
 void create_screen_bt_screen();
 void tick_screen_bt_screen();
 
-void create_screen_wifi_radio_screen();
-void tick_screen_wifi_radio_screen();
+void create_screen_aws_connect();
+void tick_screen_aws_connect();
 
-void create_screen_equalizer_screen();
-void tick_screen_equalizer_screen();
+void create_screen_equalizer_page();
+void tick_screen_equalizer_page();
 
-void create_screen_settings_screen();
-void tick_screen_settings_screen();
+void create_screen_settings_page();
+void tick_screen_settings_page();
 
 void tick_screen_by_id(enum ScreensEnum screenId);
 void tick_screen(int screen_index);

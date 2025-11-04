@@ -90,9 +90,9 @@ void create_screen_main() {
             }
         }
         {
-            // equalizer_button
+            // equalizer
             lv_obj_t *obj = lv_btn_create(parent_obj);
-            objects.equalizer_button = obj;
+            objects.equalizer = obj;
             lv_obj_set_pos(obj, 25, 66);
             lv_obj_set_size(obj, 100, 24);
             lv_obj_set_style_bg_color(obj, lv_color_hex(0xff0292a0), LV_PART_MAIN | LV_STATE_DEFAULT);

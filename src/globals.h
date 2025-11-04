@@ -9,6 +9,7 @@
 #include "driver/i2s.h"
 #include <ESP32Encoder.h>
 
+#if defined(Sera) // Sergey pin config
 #define I2S_BCK 27
 #define I2S_WS 25
 #define I2S_DATA 26
@@ -17,6 +18,33 @@
 #define ENCODER_DT_PIN 4
 #define ENCODER_BTN_PIN 35
 #define ENCODER_BTN_HOLD_TIME 2000
+
+#define TFT_BL_PIN -1 // 23
+#define TFT_CS_PIN 23 // 15
+#define TFT_RST_PIN 22
+#define TFT_DC_PIN 21
+#define TFT_SCLK_PIN 33 // 14 prev
+#define TFT_MOSI_PIN 18 // 13
+#define TFT_MISO_PIN -1
+
+#elif (Manjun) // Manjunathan pin config
+#define I2S_BCK 27
+#define I2S_WS 25
+#define I2S_DATA 26
+
+#define ENCODER_CLK_PIN 34
+#define ENCODER_DT_PIN 4
+#define ENCODER_BTN_PIN 35
+#define ENCODER_BTN_HOLD_TIME 2000
+
+#define TFT_BL_PIN -1 // 23
+#define TFT_CS_PIN 23 // 15
+#define TFT_RST_PIN 22
+#define TFT_DC_PIN 21
+#define TFT_SCLK_PIN 33 // 14 prev
+#define TFT_MOSI_PIN 18 // 13
+#define TFT_MISO_PIN -1
+#endif
 
 #define LGFX_USE_V1 // needed only for lovyanGfx lib
 
@@ -27,14 +55,6 @@
 #define TFT_W 320
 #define TFT_H 480
 #endif
-
-#define TFT_BL_PIN -1 // 23
-#define TFT_CS_PIN 23 // 15
-#define TFT_RST_PIN 22
-#define TFT_DC_PIN 21
-#define TFT_SCLK_PIN 33 // 14 prev
-#define TFT_MOSI_PIN 18 // 13
-#define TFT_MISO_PIN -1
 
 // GLOBAL VARS AND OBJECTS
 bool cbSet = false;

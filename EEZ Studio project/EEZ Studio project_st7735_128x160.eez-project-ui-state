@@ -1,6 +1,6 @@
 {
   "navigation": {
-    "selectedUserPageObject": "[EEZ Studio project_st7735_128x160.eez-project]:/userPages/3",
+    "selectedUserPageObject": "[EEZ Studio project_st7735_128x160.eez-project]:/userPages/0",
     "subnavigationSelectedItems": {}
   },
   "layoutModel": {
@@ -162,7 +162,8 @@
                       "enableClose": false,
                       "icon": "svg:hierarchy"
                     }
-                  ]
+                  ],
+                  "active": true
                 },
                 {
                   "type": "tabset",
@@ -192,16 +193,15 @@
                 {
                   "type": "tab",
                   "id": "#2f247dd5-350d-4142-8c0a-0ce0f3f7d7e2",
-                  "name": "Equalizer_Screen",
+                  "name": "Main",
                   "component": "editor",
                   "config": {
-                    "objectPath": "[EEZ Studio project_st7735_128x160.eez-project]:/userPages/3",
+                    "objectPath": "[EEZ Studio project_st7735_128x160.eez-project]:/userPages/0",
                     "permanent": false
                   },
                   "icon": "svg:page"
                 }
-              ],
-              "active": true
+              ]
             },
             {
               "type": "row",
@@ -970,12 +970,12 @@
       "selection": {
         "0": {
           "0": {
-            "0": {}
-          },
-          "1": {
-            "2": {
+            "1": {
               "$selected": true
             }
+          },
+          "1": {
+            "2": {}
           }
         }
       },
@@ -1047,7 +1047,7 @@
       "transform": {
         "translate": {
           "x": -160,
-          "y": -240
+          "y": -340
         },
         "scale": 3
       },

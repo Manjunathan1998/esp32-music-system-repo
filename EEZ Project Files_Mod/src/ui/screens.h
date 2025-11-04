@@ -18,7 +18,7 @@ typedef struct _objects_t {
     lv_obj_t *l_a2dp;
     lv_obj_t *aws_sync;
     lv_obj_t *l_aws;
-    lv_obj_t *equalizer_button;
+    lv_obj_t *equalizer;
     lv_obj_t *l_eq;
     lv_obj_t *settings;
     lv_obj_t *l_settings;

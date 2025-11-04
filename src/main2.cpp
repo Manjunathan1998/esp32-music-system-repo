@@ -68,9 +68,30 @@ void encoderReadCb(lv_indev_drv_t *drv, lv_indev_data_t *data)
 
 void updateBatteryCharge()
 {
-	char buffer[10];
-	snprintf(buffer, sizeof(buffer), "%s%%", batteryCharge.c_str());
-	lv_label_set_text(objects.charge, buffer);
+	// char buffer[10];
+	// snprintf(buffer, sizeof(buffer), "%s%%", batteryCharge.c_str());
+	// lv_label_set_text(objects.charge, buffer);
+	uint16_t charge = batteryCharge.toInt();
+
+	if (charge > 69)
+	{
+		lv_obj_set_style_bg_opa(objects.ions_left_23, 200, LV_PART_MAIN);
+		lv_obj_set_style_bg_opa(objects.ions_left_65, 200, LV_PART_MAIN);
+		lv_obj_set_style_bg_opa(objects.ions_left_69, 200, LV_PART_MAIN);
+	}
+	else if (charge > 23 && charge < 70)
+	{
+		lv_obj_set_style_bg_opa(objects.ions_left_23, 200, LV_PART_MAIN);
+		lv_obj_set_style_bg_opa(objects.ions_left_65, 200, LV_PART_MAIN);
+		lv_obj_set_style_bg_opa(objects.ions_left_69, 0, LV_PART_MAIN);
+	}
+	else if (charge < 24)
+	{
+		lv_obj_set_style_bg_opa(objects.ions_left_23, 200, LV_PART_MAIN);
+		lv_obj_set_style_bg_opa(objects.ions_left_65, 0, LV_PART_MAIN);
+		lv_obj_set_style_bg_opa(objects.ions_left_69, 0, LV_PART_MAIN);
+	}
+
 	Serial.println("BAT charge updated");
 }
 
@@ -79,18 +100,18 @@ void setupEncoderFocusGroup()
 {
 	focus_group = lv_group_create();
 
-	lv_group_add_obj(focus_group, objects.bluetooth);
-	lv_group_add_obj(focus_group, objects.inet_radio);
+	lv_group_add_obj(focus_group, objects.a2dp_bluetooth);
+	lv_group_add_obj(focus_group, objects.aws_sync);
 	lv_group_add_obj(focus_group, objects.equalizer);
 	lv_group_add_obj(focus_group, objects.settings);
 
-	lv_obj_add_flag(objects.bluetooth, LV_OBJ_FLAG_SCROLL_ON_FOCUS | LV_OBJ_FLAG_CLICKABLE);
-	lv_obj_add_flag(objects.inet_radio, LV_OBJ_FLAG_SCROLL_ON_FOCUS | LV_OBJ_FLAG_CLICKABLE);
+	lv_obj_add_flag(objects.a2dp_bluetooth, LV_OBJ_FLAG_SCROLL_ON_FOCUS | LV_OBJ_FLAG_CLICKABLE);
+	lv_obj_add_flag(objects.aws_sync, LV_OBJ_FLAG_SCROLL_ON_FOCUS | LV_OBJ_FLAG_CLICKABLE);
 	lv_obj_add_flag(objects.equalizer, LV_OBJ_FLAG_SCROLL_ON_FOCUS | LV_OBJ_FLAG_CLICKABLE);
 	lv_obj_add_flag(objects.settings, LV_OBJ_FLAG_SCROLL_ON_FOCUS | LV_OBJ_FLAG_CLICKABLE);
 
 	lv_indev_set_group(enc_indev, focus_group);
-	lv_group_focus_obj(objects.bluetooth); // focus the first item
+	lv_group_focus_obj(objects.a2dp_bluetooth); // focus the first item
 }
 
 void display_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p);
@@ -249,44 +270,44 @@ void serialTask(void *param)
 	while (1)
 	{
 		vTaskDelay(100 / portTICK_PERIOD_MS);
-		// if (Serial.available() > 0)
-		// {
-		// 	String input = Serial.readString();
-		// 	input.trim();
-		// 	Serial.println("input");
+		if (Serial.available() > 0)
+		{
+			String input = Serial.readString();
+			input.trim();
+			Serial.println("input");
 
-		// 	Serial.println(input);
-		// 	// Split at first space
-		// 	int spaceIndex = input.indexOf(' ');
-		// 	String command = "";
-		// 	String cmdValue = "0";
+			Serial.println(input);
+			// 	Split at first space
+			int spaceIndex = input.indexOf(' ');
+			String command = "";
+			String cmdValue = "0";
 
-		// 	if (spaceIndex > 0)
-		// 	{
-		// 		command = input.substring(0, spaceIndex);	// before space
-		// 		cmdValue = input.substring(spaceIndex + 1); // after space
-		// 	}
-		// 	else
-		// 	{
-		// 		command = input; // no value, just a command
-		// 	}
+			if (spaceIndex > 0)
+			{
+				command = input.substring(0, spaceIndex);	// before space
+				cmdValue = input.substring(spaceIndex + 1); // after space
+			}
+			else
+			{
+				command = input; // no value, just a command
+			}
 
-		// 	// Command handling
-		// 	if (command == "bat")
-		// 	{
-		// 		// char buf[16]; // make sure it's large enough
-		// 		// cmdValue.toCharArray(buf, sizeof(buf));
-		// 		batteryCharge = cmdValue;
-		// 		Serial.print("Battery value received: ");
-		// 		Serial.println(cmdValue);
-		// 		AppCommand cmd = CMD_BAT_UPDATE;
-		// 		xQueueSend(appCommandQueue, &cmd, 42);
-		// 	}
-		// }
+			// Command handling
+			if (command == "bat")
+			{
+				char buf[16]; // make sure it's large enough
+				cmdValue.toCharArray(buf, sizeof(buf));
+				batteryCharge = cmdValue;
+				Serial.print("Battery value received: ");
+				Serial.println(cmdValue);
+				AppCommand cmd = CMD_BAT_UPDATE;
+				xQueueSend(appCommandQueue, &cmd, pdMS_TO_TICKS(300));
+			}
+		}
 	}
 }
 
-void serialTask(void *param)
+void serialTask2(void *param)
 {
 	while (1)
 	{
@@ -475,8 +496,6 @@ void setup()
 	if (!buf)
 	{
 		Serial.println("Failed to allocate display buffer!");
-		while (1)
-			delay(1000);
 	}
 
 	// Initialize display driver
@@ -501,17 +520,17 @@ void setup()
 
 	// SETUP FOCUS GROUP
 	setupEncoderFocusGroup();
-	lv_group_focus_obj(objects.bluetooth);
+	lv_group_focus_obj(objects.a2dp_bluetooth);
 
-	menu_buttons[0] = objects.bluetooth;
-	menu_buttons[1] = objects.inet_radio;
+	menu_buttons[0] = objects.a2dp_bluetooth;
+	menu_buttons[1] = objects.aws_sync;
 	menu_buttons[2] = objects.equalizer;
 	menu_buttons[3] = objects.settings;
 
 	menu_screens[0] = objects.bt_screen;
-	menu_screens[1] = objects.wifi_radio_screen;
-	menu_screens[2] = objects.equalizer_screen;
-	menu_screens[3] = objects.settings_screen;
+	menu_screens[1] = objects.aws_connect;
+	menu_screens[2] = objects.equalizer_page;
+	menu_screens[3] = objects.settings_page;
 	Serial.println("Focus group ready");
 
 	// Tasks setup
@@ -520,7 +539,7 @@ void setup()
 	xTaskCreatePinnedToCore(encoderTask, "EncoderTask", 4096, NULL, 1, NULL, 1);
 	xTaskCreatePinnedToCore(appTask, "appTask", 3072, NULL, 3, NULL, 1); // 3rd arg matters a lot, maybe find out optimal
 	xTaskCreatePinnedToCore(serialTask, "serialTask", 1536, NULL, 1, NULL, 1);
-	xTaskCreatePinnedToCore(serialTask2, "serialTask2", 1536, NULL, 1, NULL, 1);
+	// xTaskCreatePinnedToCore(serialTask2, "serialTask2", 1536, NULL, 1, NULL, 1);  // for testing|debugging
 }
 
 void loop()
