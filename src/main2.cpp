@@ -75,21 +75,84 @@ void updateBatteryCharge()
 
 	if (charge > 69)
 	{
+		// main page
+		lv_obj_set_style_bg_opa(objects.ions_left_20, 200, LV_PART_MAIN);
+		lv_obj_set_style_bg_opa(objects.ions_left_60, 200, LV_PART_MAIN);
+		lv_obj_set_style_bg_opa(objects.ions_left_60_above, 200, LV_PART_MAIN);
+
+		// BT page
+		lv_obj_set_style_bg_opa(objects.ions_left_21, 200, LV_PART_MAIN);
+		lv_obj_set_style_bg_opa(objects.ions_left_61, 200, LV_PART_MAIN);
+		lv_obj_set_style_bg_opa(objects.ions_left_62, 200, LV_PART_MAIN);
+
+		// AWS page
+		lv_obj_set_style_bg_opa(objects.ions_left_22, 200, LV_PART_MAIN);
+		lv_obj_set_style_bg_opa(objects.ions_left_63, 200, LV_PART_MAIN);
+		lv_obj_set_style_bg_opa(objects.ions_left_64, 200, LV_PART_MAIN);
+
+		// EQ page
 		lv_obj_set_style_bg_opa(objects.ions_left_23, 200, LV_PART_MAIN);
 		lv_obj_set_style_bg_opa(objects.ions_left_65, 200, LV_PART_MAIN);
 		lv_obj_set_style_bg_opa(objects.ions_left_69, 200, LV_PART_MAIN);
+
+		// Settings page
+		lv_obj_set_style_bg_opa(objects.ions_left_24, 200, LV_PART_MAIN);
+		lv_obj_set_style_bg_opa(objects.ions_left_67, 200, LV_PART_MAIN);
+		lv_obj_set_style_bg_opa(objects.ions_left_68, 200, LV_PART_MAIN);
 	}
 	else if (charge > 23 && charge < 70)
 	{
+		// main page
+		lv_obj_set_style_bg_opa(objects.ions_left_20, 200, LV_PART_MAIN);
+		lv_obj_set_style_bg_opa(objects.ions_left_60, 200, LV_PART_MAIN);
+		lv_obj_set_style_bg_opa(objects.ions_left_60_above, 0, LV_PART_MAIN);
+
+		// BT page
+		lv_obj_set_style_bg_opa(objects.ions_left_21, 200, LV_PART_MAIN);
+		lv_obj_set_style_bg_opa(objects.ions_left_61, 200, LV_PART_MAIN);
+		lv_obj_set_style_bg_opa(objects.ions_left_62, 0, LV_PART_MAIN);
+
+		// AWS page
+		lv_obj_set_style_bg_opa(objects.ions_left_22, 200, LV_PART_MAIN);
+		lv_obj_set_style_bg_opa(objects.ions_left_63, 200, LV_PART_MAIN);
+		lv_obj_set_style_bg_opa(objects.ions_left_64, 0, LV_PART_MAIN);
+
+		// EQ page
 		lv_obj_set_style_bg_opa(objects.ions_left_23, 200, LV_PART_MAIN);
 		lv_obj_set_style_bg_opa(objects.ions_left_65, 200, LV_PART_MAIN);
 		lv_obj_set_style_bg_opa(objects.ions_left_69, 0, LV_PART_MAIN);
+
+		// Settings page
+		lv_obj_set_style_bg_opa(objects.ions_left_24, 200, LV_PART_MAIN);
+		lv_obj_set_style_bg_opa(objects.ions_left_67, 200, LV_PART_MAIN);
+		lv_obj_set_style_bg_opa(objects.ions_left_68, 0, LV_PART_MAIN);
 	}
 	else if (charge < 24)
 	{
+		// main page
+		lv_obj_set_style_bg_opa(objects.ions_left_20, 200, LV_PART_MAIN);
+		lv_obj_set_style_bg_opa(objects.ions_left_60, 0, LV_PART_MAIN);
+		lv_obj_set_style_bg_opa(objects.ions_left_60_above, 0, LV_PART_MAIN);
+
+		// BT page
+		lv_obj_set_style_bg_opa(objects.ions_left_21, 200, LV_PART_MAIN);
+		lv_obj_set_style_bg_opa(objects.ions_left_61, 0, LV_PART_MAIN);
+		lv_obj_set_style_bg_opa(objects.ions_left_62, 0, LV_PART_MAIN);
+
+		// AWS page
+		lv_obj_set_style_bg_opa(objects.ions_left_22, 200, LV_PART_MAIN);
+		lv_obj_set_style_bg_opa(objects.ions_left_63, 0, LV_PART_MAIN);
+		lv_obj_set_style_bg_opa(objects.ions_left_64, 0, LV_PART_MAIN);
+
+		// EQ page
 		lv_obj_set_style_bg_opa(objects.ions_left_23, 200, LV_PART_MAIN);
 		lv_obj_set_style_bg_opa(objects.ions_left_65, 0, LV_PART_MAIN);
 		lv_obj_set_style_bg_opa(objects.ions_left_69, 0, LV_PART_MAIN);
+
+		// Settings page
+		lv_obj_set_style_bg_opa(objects.ions_left_24, 200, LV_PART_MAIN);
+		lv_obj_set_style_bg_opa(objects.ions_left_67, 0, LV_PART_MAIN);
+		lv_obj_set_style_bg_opa(objects.ions_left_68, 0, LV_PART_MAIN);
 	}
 
 	Serial.println("BAT charge updated");
@@ -243,26 +306,6 @@ void appTask(void *param)
 		}
 	}
 }
-
-// void appTask(void *param)
-// {
-// 	while (1)
-// 	{
-// 		playMp3File(1); // start sound
-// 		vTaskDelay(600 / portTICK_PERIOD_MS);
-// 		playMp3File(2); // bt pair sound
-// 		i2s.end();
-// 		vTaskDelay(600 / portTICK_PERIOD_MS);
-
-// 		startBtSink();
-// 		vTaskDelay(15000 / portTICK_PERIOD_MS); // 15 sec
-
-// 		stopBtSink();
-// 		vTaskDelay(600 / portTICK_PERIOD_MS);
-
-// 		playMp3File(0); // bye sound
-// 	}
-// }
 
 // parsing commands from serial port. Utility process
 void serialTask(void *param)

@@ -1,6 +1,6 @@
 {
   "navigation": {
-    "selectedUserPageObject": "[New_UI_work.eez-project]:/userPages/3",
+    "selectedUserPageObject": "[New_UI_work.eez-project]:/userPages/4",
     "subnavigationSelectedItems": {}
   },
   "layoutModel": {
@@ -162,8 +162,7 @@
                       "enableClose": false,
                       "icon": "svg:hierarchy"
                     }
-                  ],
-                  "active": true
+                  ]
                 },
                 {
                   "type": "tabset",
@@ -206,15 +205,16 @@
                 {
                   "type": "tab",
                   "id": "#199ed922-57ed-4b8e-8f94-17fb6320977c",
-                  "name": "equalizer_page",
+                  "name": "Settings_page",
                   "component": "editor",
                   "config": {
-                    "objectPath": "[New_UI_work.eez-project]:/userPages/3",
+                    "objectPath": "[New_UI_work.eez-project]:/userPages/4",
                     "permanent": false
                   },
                   "icon": "svg:page"
                 }
-              ]
+              ],
+              "active": true
             },
             {
               "type": "row",
@@ -982,15 +982,19 @@
     "[New_UI_work.eez-project]:/userPages/0[flow-state]": {
       "selection": {
         "0": {
-          "1": {}
+          "1": {},
+          "6": {},
+          "8": {
+            "$selected": true
+          }
         }
       },
       "transform": {
         "translate": {
-          "x": -231.63406649502832,
-          "y": -73.96005633795934
+          "x": -63.988267475254744,
+          "y": -154.26374172304273
         },
-        "scale": 2.5
+        "scale": 4
       },
       "timeline": {
         "isEditorActive": false,
@@ -1013,10 +1017,77 @@
       },
       "transform": {
         "translate": {
-          "x": -1528.5238428238422,
-          "y": -116.00734265734314
+          "x": -1173.8143523143508,
+          "y": -217.55754245754335
         },
-        "scale": 12
+        "scale": 8
+      },
+      "timeline": {
+        "isEditorActive": false,
+        "position": 0,
+        "secondToPx": 200,
+        "scrollLeft": 0
+      }
+    },
+    "[New_UI_work.eez-project]:/userPages/1[flow-state]": {
+      "selection": {
+        "0": {
+          "7": {},
+          "9": {
+            "$selected": true
+          }
+        }
+      },
+      "transform": {
+        "translate": {
+          "x": -80,
+          "y": -64
+        },
+        "scale": 4
+      },
+      "timeline": {
+        "isEditorActive": false,
+        "position": 0,
+        "secondToPx": 200,
+        "scrollLeft": 0
+      }
+    },
+    "[New_UI_work.eez-project]:/userPages/2[flow-state]": {
+      "selection": {
+        "0": {
+          "5": {
+            "$selected": true
+          }
+        }
+      },
+      "transform": {
+        "translate": {
+          "x": -80,
+          "y": -64
+        },
+        "scale": 4
+      },
+      "timeline": {
+        "isEditorActive": false,
+        "position": 0,
+        "secondToPx": 200,
+        "scrollLeft": 0
+      }
+    },
+    "[New_UI_work.eez-project]:/userPages/4[flow-state]": {
+      "selection": {
+        "0": {
+          "5": {
+            "$selected": true
+          }
+        }
+      },
+      "transform": {
+        "translate": {
+          "x": -863,
+          "y": -166
+        },
+        "scale": 8
       },
       "timeline": {
         "isEditorActive": false,
@@ -1046,6 +1117,6 @@
   ],
   "showInactiveFlowsInDebugger": true,
   "globalFlowZoom": true,
-  "flowZoom": 12,
+  "flowZoom": 8,
   "implementationLanguage": "C"
 }
