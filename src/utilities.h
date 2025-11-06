@@ -1,8 +1,7 @@
-#ifndef UTILITIES_H
-#define UTILITIES_H
-
+#pragma once
+#include <Arduino.h>
 #include <SPIFFS.h>
 
 void listSPIFFS(void);
 
-#endif
+void printLine(String);

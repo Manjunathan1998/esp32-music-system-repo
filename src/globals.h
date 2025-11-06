@@ -75,7 +75,8 @@ enum AppCommand
     CMD_SWITCH_TO_SCR_SETTINGS,
     CMD_BT_RESTART,
     CMD_BT_STOP,
-    CMD_BAT_UPDATE
+    CMD_BAT_UPDATE,
+    CMD_SHUT_DOWN
 };
 
 // 1 - Hello sound; 0 - Bye sound; 2 - bt pair ready

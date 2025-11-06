@@ -12,3 +12,10 @@ void listSPIFFS()
         file = root.openNextFile();
     }
 }
+
+void printLine(String text)
+{
+#ifdef DEBUG_PRINT
+    Serial.println(text);
+#endif
+}
