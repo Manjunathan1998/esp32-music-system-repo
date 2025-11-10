@@ -61,8 +61,17 @@ bool cbSet = false;
 bool startupDone = false;
 bool btSinkActive = false;
 static lv_obj_t *current_screen = NULL;
-// const char *batteryCharge = "0";
 String batteryCharge = "0";
+// String playbackStatus = "Stopped";
+// const char *trackName;
+// const char *artistName;
+
+char artistName[128] = {0};
+char trackName[128] = {0};
+char playbackStatus[128] = {0};
+bool metadata_updated = false;
+volatile bool playback_status_updated = false;
+uint16_t BTvolume = -1;
 
 // All internal commands
 enum AppCommand
@@ -87,11 +96,17 @@ enum SoundFile
     F_BT_PAIR_SND
 };
 
+enum EncoderDirection
+{
+    ENC_INCREMENT,
+    ENC_DECREMENT
+};
+
 QueueHandle_t appCommandQueue; // "transmits" the app commands
 
 // Encoder variables
 ESP32Encoder encoder;
-volatile int64_t encoderPos = 0;
+volatile int64_t newEncoderPos, oldEncoderPos = 0;
 lv_indev_t *enc_indev;
 lv_group_t *focus_group;
 lv_obj_t *menu_buttons[4];

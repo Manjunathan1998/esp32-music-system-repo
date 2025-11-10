@@ -55,11 +55,79 @@ void switchToScreen(void *screen_ptr)
 	current_screen = target; // save current active screen
 }
 
-// LVGL input device callback. Allows to use encoder in lvgl UI
+// BT metadata print
+void avrc_metadata_callback(uint8_t attr_id, const uint8_t *attr_text)
+{
+	// Serial.println("meta callback ");
+	switch (attr_id)
+	{
+	case ESP_AVRC_MD_ATTR_TITLE:
+		Serial.print("Title: ");
+		strncpy(trackName, (const char *)attr_text, sizeof(trackName) - 1);
+		trackName[sizeof(trackName) - 1] = '\0';
+		break;
+	case ESP_AVRC_MD_ATTR_ARTIST:
+		Serial.print("Artist: ");
+		strncpy(artistName, (const char *)attr_text, sizeof(artistName) - 1);
+		artistName[sizeof(artistName) - 1] = '\0';
+		break;
+	default:
+		// Serial.print("Other: ");
+		break;
+	}
+	metadata_updated = true;
+	// Serial.println((const char *)attr_text);
+}
+
+// BT playback status handling
+const char *playbackStatusToStr(esp_avrc_playback_stat_t status)
+{
+	switch (status)
+	{
+	case ESP_AVRC_PLAYBACK_STOPPED:
+		return "stopped";
+	case ESP_AVRC_PLAYBACK_PLAYING:
+		return "playing";
+	case ESP_AVRC_PLAYBACK_PAUSED:
+		return "paused";
+	case ESP_AVRC_PLAYBACK_FWD_SEEK:
+		return "forward seek";
+	case ESP_AVRC_PLAYBACK_REV_SEEK:
+		return "reverse seek";
+	default:
+		return "unknown";
+	}
+}
+
+void avrc_playback_status_changed(esp_avrc_playback_stat_t playback)
+{
+	Serial.print("Playback status changed: ");
+	Serial.println(playbackStatusToStr(playback));
+
+	switch (playback)
+	{
+	case ESP_AVRC_PLAYBACK_PLAYING:
+		strncpy(playbackStatus, "Playing", sizeof(playbackStatus) - 1);
+		break;
+	case ESP_AVRC_PLAYBACK_PAUSED:
+		strncpy(playbackStatus, "Paused", sizeof(playbackStatus) - 1);
+		break;
+	case ESP_AVRC_PLAYBACK_STOPPED:
+		strncpy(playbackStatus, "Stopped", sizeof(playbackStatus) - 1);
+		break;
+	default:
+		strncpy(playbackStatus, "Unknown", sizeof(playbackStatus) - 1);
+		break;
+	}
+	playbackStatus[sizeof(playbackStatus) - 1] = '\0'; // overflow protection
+	playback_status_updated = true;
+}
+
+// LVGL input device callback. Allows to use encoder with LVGL Menu
 void encoderReadCb(lv_indev_drv_t *drv, lv_indev_data_t *data)
 {
 	static int64_t last = 0;
-	int64_t pos = encoderPos;
+	int64_t pos = newEncoderPos;
 
 	data->enc_diff = pos - last;
 	last = pos;
@@ -67,9 +135,6 @@ void encoderReadCb(lv_indev_drv_t *drv, lv_indev_data_t *data)
 
 void updateBatteryCharge()
 {
-	// char buffer[10];
-	// snprintf(buffer, sizeof(buffer), "%s%%", batteryCharge.c_str());
-	// lv_label_set_text(objects.charge, buffer);
 	uint16_t charge = batteryCharge.toInt();
 
 	if (charge > 69)
@@ -157,13 +222,22 @@ void updateBatteryCharge()
 	Serial.println("BAT charge updated");
 }
 
-void handle_volume_control()
+// bool encDir - true - increment, false - decrement
+void handle_volume_control(bool encDir)
 {
-	int get_device_volume = a2dp_sink.get_volume();
-
-	// Set Volume to remote device
-	a2dp_sink.set_volume(10);
-	// Serial.println(counter);
+	BTvolume = a2dp_sink.get_volume();
+	if (encDir)
+	{
+		a2dp_sink.set_volume(BTvolume + 1);
+		Serial.print("BTvolume ");
+		Serial.println(BTvolume + 1);
+	}
+	else
+	{
+		a2dp_sink.set_volume(BTvolume + -1);
+		Serial.print("BTvolume ");
+		Serial.println(BTvolume - 1);
+	}
 }
 
 // FOCUS GROUP SETUP
@@ -230,6 +304,8 @@ void startBtSink()
 		i2s.begin(cfg);
 	}
 
+	a2dp_sink.set_avrc_metadata_callback(avrc_metadata_callback);
+	a2dp_sink.set_avrc_rn_playstatus_callback(avrc_playback_status_changed);
 	a2dp_sink.set_auto_reconnect(true, 4); // Auto reconnect if disconnected
 	a2dp_sink.start("ESP32 Music");		   // Advertise device name
 	btSinkActive = true;
@@ -385,16 +461,34 @@ void encoderTask(void *param)
 	int16_t last_val = 0;
 	while (1)
 	{
-		encoderPos = encoder.getCount() / 2;
-		button.update(); // must be called repeatedly
+		newEncoderPos = encoder.getCount() / 2;
+
+		if (current_screen == objects.bt_screen && newEncoderPos != oldEncoderPos)
+		{
+			// Serial.print("newEncoderPos ");
+			// Serial.println(newEncoderPos);
+			// Serial.print("oldEncoderPos ");
+			// Serial.println(oldEncoderPos);
+
+			if (oldEncoderPos < newEncoderPos)
+			{
+				handle_volume_control(true);
+			}
+			else if (oldEncoderPos > newEncoderPos)
+			{
+				handle_volume_control(false);
+			}
+		}
+		oldEncoderPos = newEncoderPos;
 
 		// button logic
+		button.update(); // must be called repeatedly
+
 		if (button.fell())
 		{
 			// Button just pressed
 			pressStartTime = millis();
 			isPressed = true;
-			// longPressTriggered = false;
 		}
 
 		// Button held long enough for shutting down
@@ -473,7 +567,7 @@ void encoderTask(void *param)
 }
 
 /* LVGL EEZ STUDIO UI
- * should not be changed
+ * any custom UI updates happen here
  */
 void uiTask(void *param)
 {
@@ -482,6 +576,22 @@ void uiTask(void *param)
 	{
 		lv_timer_handler();
 		ui_tick(); // This is important for EEZ-generated UI
+
+		// custom UI updates
+		if (metadata_updated)
+		{
+			lv_label_set_text(objects.track_name_placeholder, trackName);
+			lv_label_set_text(objects.artist_name_placeholder, artistName);
+			metadata_updated = false;
+		}
+
+		if (playback_status_updated)
+		{
+			// update UI
+			lv_label_set_text(objects.play_status_placeholder, playbackStatus);
+			playback_status_updated = false;
+		}
+
 		vTaskDelay(5 / portTICK_PERIOD_MS);
 	}
 }

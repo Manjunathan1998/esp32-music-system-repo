@@ -28,14 +28,17 @@ typedef struct _objects_t {
     lv_obj_t *ions_left_60_above;
     lv_obj_t *bluetooth_panel_container;
     lv_obj_t *bluetooth_panel;
+    lv_obj_t *track_name;
     lv_obj_t *artist_name;
-    lv_obj_t *track_name_1;
     lv_obj_t *status_;
     lv_obj_t *track_name_2;
     lv_obj_t *battery_skeleton_1;
     lv_obj_t *ions_left_21;
     lv_obj_t *ions_left_61;
     lv_obj_t *ions_left_62;
+    lv_obj_t *artist_name_placeholder;
+    lv_obj_t *track_name_placeholder;
+    lv_obj_t *play_status_placeholder;
     lv_obj_t *aws_panel_container;
     lv_obj_t *aws_panel_1;
     lv_obj_t *battery_skeleton_2;
