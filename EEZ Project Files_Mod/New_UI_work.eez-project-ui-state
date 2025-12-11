@@ -1,6 +1,6 @@
 {
   "navigation": {
-    "selectedUserPageObject": "[New_UI_work.eez-project]:/userPages/4",
+    "selectedUserPageObject": "[New_UI_work.eez-project]:/userPages/1",
     "subnavigationSelectedItems": {}
   },
   "layoutModel": {
@@ -205,10 +205,10 @@
                 {
                   "type": "tab",
                   "id": "#199ed922-57ed-4b8e-8f94-17fb6320977c",
-                  "name": "Settings_page",
+                  "name": "BT_Screen",
                   "component": "editor",
                   "config": {
-                    "objectPath": "[New_UI_work.eez-project]:/userPages/4",
+                    "objectPath": "[New_UI_work.eez-project]:/userPages/1",
                     "permanent": false
                   },
                   "icon": "svg:page"
@@ -1033,17 +1033,15 @@
       "selection": {
         "0": {
           "7": {},
-          "9": {
-            "$selected": true
-          }
+          "9": {}
         }
       },
       "transform": {
         "translate": {
-          "x": -80,
-          "y": -64
+          "x": -326.69642857142856,
+          "y": -509.8928571428571
         },
-        "scale": 4
+        "scale": 6
       },
       "timeline": {
         "isEditorActive": false,
@@ -1085,7 +1083,7 @@
       "transform": {
         "translate": {
           "x": -863,
-          "y": -166
+          "y": -466
         },
         "scale": 8
       },
@@ -1117,6 +1115,6 @@
   ],
   "showInactiveFlowsInDebugger": true,
   "globalFlowZoom": true,
-  "flowZoom": 8,
+  "flowZoom": 6,
   "implementationLanguage": "C"
 }

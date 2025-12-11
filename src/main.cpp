@@ -234,7 +234,7 @@ void handle_volume_control(bool encDir)
 	}
 	else
 	{
-		a2dp_sink.set_volume(BTvolume + -1);
+		a2dp_sink.set_volume(BTvolume - 1);
 		Serial.print("BTvolume ");
 		Serial.println(BTvolume - 1);
 	}
@@ -599,6 +599,8 @@ void uiTask(void *param)
 void setup()
 {
 	Serial.begin(115200);
+
+	checkBoardMemory(); // Available RAM/ROM/Heap
 
 	// I2S and audio setup
 	Serial.printf("Free heap before i2s begin: %u bytes\n", esp_get_free_heap_size());
