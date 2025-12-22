@@ -46,6 +46,10 @@ typedef struct _objects_t {
     lv_obj_t *ions_left_63;
     lv_obj_t *ions_left_64;
     lv_obj_t *eq_panel_container;
+    lv_obj_t *btn_theater;
+    lv_obj_t *l_theater;
+    lv_obj_t *btn_car;
+    lv_obj_t *l_car;
     lv_obj_t *eq_panel;
     lv_obj_t *battery_skeleton_3;
     lv_obj_t *ions_left_69;

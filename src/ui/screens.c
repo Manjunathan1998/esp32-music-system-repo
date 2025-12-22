@@ -108,7 +108,7 @@ void create_screen_main() {
                     lv_label_set_recolor(obj, true);
                     lv_obj_set_style_align(obj, LV_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
                     lv_obj_set_style_text_letter_space(obj, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
-                    lv_label_set_text(obj, "Tune Matrix");
+                    lv_label_set_text(obj, "Equalizer");
                 }
             }
         }
@@ -543,6 +543,55 @@ void create_screen_equalizer_page() {
             lv_obj_set_style_radius(obj, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_bg_color(obj, lv_color_hex(0xff3e4f59), LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_bg_opa(obj, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+            {
+                lv_obj_t *parent_obj = obj;
+                {
+                    // btn_theater
+                    lv_obj_t *obj = lv_btn_create(parent_obj);
+                    objects.btn_theater = obj;
+                    lv_obj_set_pos(obj, 30, 41);
+                    lv_obj_set_size(obj, 100, 24);
+                    lv_obj_set_style_bg_color(obj, lv_color_hex(0xff0292a0), LV_PART_MAIN | LV_STATE_DEFAULT);
+                    {
+                        lv_obj_t *parent_obj = obj;
+                        {
+                            // l_theater
+                            lv_obj_t *obj = lv_label_create(parent_obj);
+                            objects.l_theater = obj;
+                            lv_obj_set_pos(obj, 0, 0);
+                            lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+                            lv_label_set_long_mode(obj, LV_LABEL_LONG_DOT);
+                            lv_label_set_recolor(obj, true);
+                            lv_obj_set_style_align(obj, LV_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+                            lv_obj_set_style_text_letter_space(obj, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
+                            lv_label_set_text(obj, "Theater");
+                        }
+                    }
+                }
+                {
+                    // btn_car
+                    lv_obj_t *obj = lv_btn_create(parent_obj);
+                    objects.btn_car = obj;
+                    lv_obj_set_pos(obj, 30, 78);
+                    lv_obj_set_size(obj, 100, 24);
+                    lv_obj_set_style_bg_color(obj, lv_color_hex(0xff0292a0), LV_PART_MAIN | LV_STATE_DEFAULT);
+                    {
+                        lv_obj_t *parent_obj = obj;
+                        {
+                            // l_car
+                            lv_obj_t *obj = lv_label_create(parent_obj);
+                            objects.l_car = obj;
+                            lv_obj_set_pos(obj, 0, 0);
+                            lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+                            lv_label_set_long_mode(obj, LV_LABEL_LONG_DOT);
+                            lv_label_set_recolor(obj, true);
+                            lv_obj_set_style_align(obj, LV_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+                            lv_obj_set_style_text_letter_space(obj, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
+                            lv_label_set_text(obj, "Car");
+                        }
+                    }
+                }
+            }
         }
         {
             // eq_panel

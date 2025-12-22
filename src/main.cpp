@@ -259,6 +259,36 @@ void setupEncoderFocusGroup()
 	lv_group_focus_obj(objects.a2dp_bluetooth); // focus the first item
 }
 
+// FOCUS GROUP SETUP FOR EQUALIZER PAGE
+void setupEncoderFocusGroupEQ()
+{
+	focus_group_eq = lv_group_create();
+
+	lv_group_add_obj(focus_group_eq, objects.btn_theater);
+	lv_group_add_obj(focus_group_eq, objects.btn_car);
+
+	lv_obj_add_flag(objects.btn_theater, LV_OBJ_FLAG_SCROLL_ON_FOCUS | LV_OBJ_FLAG_CLICKABLE);
+	lv_obj_add_flag(objects.btn_car, LV_OBJ_FLAG_SCROLL_ON_FOCUS | LV_OBJ_FLAG_CLICKABLE);
+
+	lv_group_focus_obj(objects.btn_theater); // focus the first button
+}
+
+void switchToEQFocusGroup()
+{
+	Serial.println(">>> switchToEQFocusGroup called");
+	lv_indev_set_group(enc_indev, focus_group_eq);
+	lv_group_focus_obj(objects.btn_theater);
+	Serial.println(">>> EQ focus group active, btn_theater focused");
+}
+
+void switchToMainFocusGroup()
+{
+	Serial.println(">>> switchToMainFocusGroup called");
+	lv_indev_set_group(enc_indev, focus_group);
+	lv_group_focus_obj(objects.a2dp_bluetooth);
+	Serial.println(">>> Main focus group active, a2dp_bluetooth focused");
+}
+
 void display_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p);
 
 // i2s callback for printing audio data from the file
@@ -342,6 +372,7 @@ void appTask(void *param)
 				lv_async_call([](void *unused)
 							  {
                         switchToScreen(objects.main);
+						switchToMainFocusGroup();
                         stopBtSink(); },
 							  NULL);
 				break;
@@ -365,7 +396,8 @@ void appTask(void *param)
 				break;
 			case CMD_SWITCH_TO_SCR_EQ:
 				lv_async_call([](void *unused)
-							  { switchToScreen(menu_screens[2]); },
+							  { switchToScreen(menu_screens[2]); 
+								switchToEQFocusGroup(); },
 							  NULL);
 				break;
 			case CMD_SWITCH_TO_SCR_SETTINGS:
@@ -389,7 +421,21 @@ void appTask(void *param)
 				updateBatteryCharge();
 				break;
 
+			case CMD_EQ_SET_THEATER:
+				Serial.println(">>> Executing: CMD_EQ_SET_THEATER");
+				Serial.println("EQ: Theater preset selected");
+				// TODO: Apply theater EQ preset when EQ is implemented
+				break;
+
+			case CMD_EQ_SET_CAR:
+				Serial.println(">>> Executing: CMD_EQ_SET_CAR");
+				Serial.println("EQ: Car preset selected");
+				// TODO: Apply car EQ preset when EQ is implemented
+				break;
+
 			default:
+				Serial.print(">>> WARNING: Unknown command: ");
+				Serial.println(cmd);
 				break;
 			}
 		}
@@ -523,9 +569,9 @@ void encoderTask(void *param)
 		{
 			// single click
 			lv_obj_t *focused = lv_group_get_focused(focus_group);
+			AppCommand cmd = CMD_NONE;
 			if (focused)
 			{
-				AppCommand cmd = CMD_NONE;
 				for (int i = 0; i < 4; ++i)
 				{
 					if (focused == menu_buttons[i])
@@ -552,11 +598,45 @@ void encoderTask(void *param)
 						break;
 					}
 				}
+			}
 
-				if (cmd != CMD_NONE)
+			// If no main button matched, check EQ buttons
+			if (cmd == CMD_NONE)
+			{
+				focused = lv_group_get_focused(focus_group_eq);
+				Serial.print("DEBUG: Focused object from EQ focus_group_eq = ");
+				Serial.println((uint32_t)focused, HEX);
+
+				if (focused)
 				{
-					xQueueSend(appCommandQueue, &cmd, 0);
+					for (int i = 0; i < 2; ++i)
+					{
+						if (focused == eq_buttons[i])
+						{
+							Serial.print("DEBUG: Matched eq_buttons[");
+							Serial.print(i);
+							Serial.println("]");
+
+							switch (i)
+							{
+							case 0:
+								cmd = CMD_EQ_SET_THEATER;
+								Serial.println("CMD_EQ_SET_THEATER");
+								break;
+							case 1:
+								cmd = CMD_EQ_SET_CAR;
+								Serial.println("CMD_EQ_SET_CAR");
+								break;
+							}
+							break;
+						}
+					}
 				}
+			}
+
+			if (cmd != CMD_NONE)
+			{
+				xQueueSend(appCommandQueue, &cmd, 0);
 			}
 
 			waitingForSecondClick = false;
@@ -602,21 +682,29 @@ void setup()
 
 	checkBoardMemory(); // Available RAM/ROM/Heap
 
+	// Mount SPIFFS for audio files
+	if (!SPIFFS.begin(true))
+	{
+		Serial.println("Failed to mount SPIFFS");
+	}
+	else
+	{
+		Serial.println("SPIFFS mounted successfully");
+	}
+
 	// I2S and audio setup
 	Serial.printf("Free heap before i2s begin: %u bytes\n", esp_get_free_heap_size());
 	AudioToolsLogger.begin(Serial, AudioToolsLogLevel::Info);
 	Serial.println("Starting I2S...");
 	auto cfg = i2s.defaultConfig(TX_MODE);
+	cfg.pin_bck = I2S_BCK;
+	cfg.pin_ws = I2S_WS;
+	cfg.pin_data = I2S_DATA;
 	cfg.copyFrom(info);
-	cfg.buffer_count = 4;
-	cfg.buffer_size = 64;
+	cfg.buffer_count = 8;  // can be adjusted to achieve smooth sound
+	cfg.buffer_size = 256; // can be adjusted to achieve smooth sound
 	i2s.begin(cfg);
 	Serial.printf("Free heap after i2s begin: %u bytes\n", esp_get_free_heap_size());
-
-	if (!SPIFFS.begin(true))
-	{
-		Serial.println("Failed to mount SPIFFS");
-	}
 
 	size_t psramSize = heap_caps_get_total_size(MALLOC_CAP_SPIRAM);
 	Serial.printf("Total PSRAM available: %u bytes\n", psramSize);
@@ -696,7 +784,22 @@ void setup()
 	menu_screens[1] = objects.aws_connect;
 	menu_screens[2] = objects.equalizer_page;
 	menu_screens[3] = objects.settings_page;
+
+	eq_buttons[0] = objects.btn_theater;
+	eq_buttons[1] = objects.btn_car;
+
 	Serial.println("Focus group ready");
+
+	// Setup EQ page focus group
+	setupEncoderFocusGroupEQ();
+	Serial.println("EQ focus group ready");
+
+	// Play startup sound
+	Serial.println("Playing startup sound...");
+	vTaskDelay(200 / portTICK_PERIOD_MS); // Longer delay to ensure I2S is fully stabilized
+	playMp3File(1);						  // Play hello.mp3
+	vTaskDelay(100 / portTICK_PERIOD_MS); // Brief delay after sound playback
+	Serial.println("Startup sound playback completed");
 
 	// Tasks setup
 	appCommandQueue = xQueueCreate(8, sizeof(AppCommand));

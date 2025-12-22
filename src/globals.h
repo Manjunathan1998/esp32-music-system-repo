@@ -85,7 +85,9 @@ enum AppCommand
     CMD_BT_RESTART,
     CMD_BT_STOP,
     CMD_BAT_UPDATE,
-    CMD_SHUT_DOWN
+    CMD_SHUT_DOWN,
+    CMD_EQ_SET_THEATER,
+    CMD_EQ_SET_CAR
 };
 
 // 1 - Hello sound; 0 - Bye sound; 2 - bt pair ready
@@ -111,6 +113,9 @@ lv_indev_t *enc_indev;
 lv_group_t *focus_group;
 lv_obj_t *menu_buttons[4];
 lv_obj_t *menu_screens[4];
+
+lv_group_t *focus_group_eq;
+lv_obj_t *eq_buttons[2];
 
 // Button variables
 Bounce button = Bounce();
