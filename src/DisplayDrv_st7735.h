@@ -29,9 +29,9 @@ public:
     // Display parameters - adjust based on your display specs
     cfg.panel_width = 128;
     cfg.panel_height = 160;
-    cfg.offset_x = 0;
-    cfg.offset_y = 2;
-    cfg.offset_rotation = 3;
+    cfg.offset_x = 4;
+    cfg.offset_y = 0;
+    cfg.offset_rotation = 1;
     cfg.rgb_order = true;
 
     _panel.config(cfg);
