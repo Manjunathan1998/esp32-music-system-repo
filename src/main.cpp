@@ -20,11 +20,28 @@ LGFX_st7796 lcd;
 AudioInfo info(44100, 2, 16);
 I2SStream i2s;
 
-// mp3 startup sound setup
+VolumeStream volume_stream(i2s);
+
+// EQ setup
+Equalizer3Bands *equalizer = nullptr;
+// EQ settings (in dB) - Testing with cuts
+float bassGain = 0.0;	  // Low frequencies (< 500 Hz) - Keep as is
+float midGain = 1.0;	  // Mid frequencies (500 Hz - 3 kHz) - CUT to -12 dB
+float trebleGain = -12.0; // High frequencies (> 3 kHz) - CUT to -12 dB
+float volumeLevel = 1.0;  // Reduce MP3 volume (0.0 to 1.0, where 1.0 = 100%)
+
+// Audio callback - processes audio data with EQ (for Bluetooth)
+void audio_data_callback(const uint8_t *data, uint32_t len)
+{
+	// Write audio data to equalizer, which processes and outputs to I2S
+	equalizer->write(data, len);
+}
+
+// mp3 startup sound setup (initialized in setup() after equalizer)
 MP3DecoderHelix helix;
 AudioSourceSPIFFS source("/", ".mp3");
-AudioPlayer player(source, i2s, helix);
-EncodedAudioStream out(&i2s, &helix); // output to decoder
+AudioPlayer *player = nullptr;	   // Will be initialized in setup()
+EncodedAudioStream *out = nullptr; // Will be initialized in setup()
 BluetoothA2DPSink a2dp_sink(i2s);
 
 // LVGL buffer
@@ -302,20 +319,26 @@ void printMetaData(MetaDataType type, const char *str, int len)
 
 void playMp3File(int choice)
 {
+	if (!player)
+	{
+		Serial.println("ERROR: Player not initialized!");
+		return;
+	}
+
 	if (!cbSet)
 	{
 		Serial.println("Init new player");
-		// player.setMetadataCallback(printMetaData);
+		// player->setMetadataCallback(printMetaData);
 		cbSet = true;
 	}
 
-	if (!player.begin(choice))
+	if (!player->begin(choice))
 	{
 		Serial.println("Failed to start player");
 		return;
 	}
 
-	player.copyAll();
+	player->copyAll();
 }
 
 // Start BT sink. Call this function when user switches to Bluetooth menu
@@ -336,6 +359,9 @@ void startBtSink()
 
 	a2dp_sink.set_avrc_metadata_callback(avrc_metadata_callback);
 	a2dp_sink.set_avrc_rn_playstatus_callback(avrc_playback_status_changed);
+
+	a2dp_sink.set_stream_reader(audio_data_callback, false);
+
 	a2dp_sink.set_auto_reconnect(true, 4); // Auto reconnect if disconnected
 	a2dp_sink.start("ESP32 Music");		   // Advertise device name
 	btSinkActive = true;
@@ -423,14 +449,54 @@ void appTask(void *param)
 
 			case CMD_EQ_SET_THEATER:
 				Serial.println(">>> Executing: CMD_EQ_SET_THEATER");
-				Serial.println("EQ: Theater preset selected");
-				// TODO: Apply theater EQ preset when EQ is implemented
+				Serial.println("EQ: Applying Theater preset (Bass boost + Enhanced highs)");
+				// Theater preset: Enhanced bass and treble for cinematic sound
+				bassGain = 1.0;		// Low frequencies: +6 dB boost
+				midGain = -12.0;	// Mid frequencies: -2 dB (reduce muddiness)
+				trebleGain = -14.0; // High frequencies: +4 dB boost
+
+				// Apply to equalizer in real-time
+				if (equalizer)
+				{
+					auto eq_cfg = equalizer->defaultConfig();
+					eq_cfg.sample_rate = 44100;
+					eq_cfg.channels = 2;
+					eq_cfg.bits_per_sample = 16;
+					eq_cfg.freq_low = 500;
+					eq_cfg.freq_high = 3000;
+					eq_cfg.gain_low = bassGain;
+					eq_cfg.gain_medium = midGain;
+					eq_cfg.gain_high = trebleGain;
+					equalizer->begin(eq_cfg);
+					Serial.printf("Theater EQ applied: Bass +%.1fdB, Mid %.1fdB, Treble +%.1fdB\n",
+								  bassGain, midGain, trebleGain);
+				}
 				break;
 
 			case CMD_EQ_SET_CAR:
 				Serial.println(">>> Executing: CMD_EQ_SET_CAR");
-				Serial.println("EQ: Car preset selected");
-				// TODO: Apply car EQ preset when EQ is implemented
+				Serial.println("EQ: Applying Car preset (Balanced + Vocal clarity)");
+				// Car preset: Balanced with enhanced mids for vocal clarity
+				bassGain = 1.0;		// Low frequencies: +3 dB moderate boost
+				midGain = -12.0;	// Mid frequencies: +2 dB (vocal clarity)
+				trebleGain = -14.0; // High frequencies: +1 dB subtle boost
+
+				// Apply to equalizer in real-time
+				if (equalizer)
+				{
+					auto eq_cfg = equalizer->defaultConfig();
+					eq_cfg.sample_rate = 44100;
+					eq_cfg.channels = 2;
+					eq_cfg.bits_per_sample = 16;
+					eq_cfg.freq_low = 500;
+					eq_cfg.freq_high = 3000;
+					eq_cfg.gain_low = bassGain;
+					eq_cfg.gain_medium = midGain;
+					eq_cfg.gain_high = trebleGain;
+					equalizer->begin(eq_cfg);
+					Serial.printf("Car EQ applied: Bass +%.1fdB, Mid +%.1fdB, Treble +%.1fdB\n",
+								  bassGain, midGain, trebleGain);
+				}
 				break;
 
 			default:
@@ -480,6 +546,87 @@ void serialTask(void *param)
 				Serial.println(cmdValue);
 				AppCommand cmd = CMD_BAT_UPDATE;
 				xQueueSend(appCommandQueue, &cmd, pdMS_TO_TICKS(300));
+			}
+			// EQ control commands
+			else if (command == "bass" || command == "low")
+			{
+				float newGain = cmdValue.toFloat();
+				bassGain = newGain;
+				// Serial.printf("Bass set to: %.1f dB\n", bassGain);
+				
+				// Apply immediately
+				if (equalizer) {
+					equalizer->setAudioInfo(info);  // Ensure audio info is set
+					auto eq_cfg = equalizer->defaultConfig();
+					eq_cfg.sample_rate = 44100;
+					eq_cfg.channels = 2;
+					eq_cfg.bits_per_sample = 16;
+					eq_cfg.freq_low = 500;
+					eq_cfg.freq_high = 3000;
+					eq_cfg.gain_low = bassGain;
+					eq_cfg.gain_medium = midGain;
+					eq_cfg.gain_high = trebleGain;
+					equalizer->begin(eq_cfg);
+					// Serial.println("EQ updated!");
+				}
+			}
+			else if (command == "mid")
+			{
+				float newGain = cmdValue.toFloat();
+				midGain = newGain;
+				// Serial.printf("Mid set to: %.1f dB\n", midGain);
+				
+				// Apply immediately
+				if (equalizer) {
+					equalizer->setAudioInfo(info);  // Ensure audio info is set
+					auto eq_cfg = equalizer->defaultConfig();
+					eq_cfg.sample_rate = 44100;
+					eq_cfg.channels = 2;
+					eq_cfg.bits_per_sample = 16;
+					eq_cfg.freq_low = 500;
+					eq_cfg.freq_high = 3000;
+					eq_cfg.gain_low = bassGain;
+					eq_cfg.gain_medium = midGain;
+					eq_cfg.gain_high = trebleGain;
+					equalizer->begin(eq_cfg);
+					// Serial.println("EQ updated!");
+				}
+			}
+			else if (command == "high" || command == "treble")
+			{
+				float newGain = cmdValue.toFloat();
+				trebleGain = newGain;
+				// Serial.printf("Treble set to: %.1f dB\n", trebleGain);
+				
+				// Apply immediately
+				if (equalizer) {
+					equalizer->setAudioInfo(info);  // Ensure audio info is set
+					auto eq_cfg = equalizer->defaultConfig();
+					eq_cfg.sample_rate = 44100;
+					eq_cfg.channels = 2;
+					eq_cfg.bits_per_sample = 16;
+					eq_cfg.freq_low = 500;
+					eq_cfg.freq_high = 3000;
+					eq_cfg.gain_low = bassGain;
+					eq_cfg.gain_medium = midGain;
+					eq_cfg.gain_high = trebleGain;
+					equalizer->begin(eq_cfg);
+					// Serial.println("EQ updated!");
+				}
+			}
+			else if (command == "eq")
+			{
+				// Show current EQ settings
+				Serial.println("===== Current EQ Settings =====");
+				Serial.printf("  Bass:   %.1f dB\n", bassGain);
+				Serial.printf("  Mid:    %.1f dB\n", midGain);
+				Serial.printf("  Treble: %.1f dB\n", trebleGain);
+				Serial.println("===============================");
+				// Serial.println("Usage:");
+				// Serial.println("  bass <value>   - Set bass gain (e.g., 'bass 6')");
+				// Serial.println("  mid <value>    - Set mid gain (e.g., 'mid -2')");
+				// Serial.println("  high <value>   - Set treble gain (e.g., 'high 4')");
+				// Serial.println("  eq             - Show current settings");
 			}
 		}
 	}
@@ -705,6 +852,44 @@ void setup()
 	cfg.buffer_size = 256; // can be adjusted to achieve smooth sound
 	i2s.begin(cfg);
 	Serial.printf("Free heap after i2s begin: %u bytes\n", esp_get_free_heap_size());
+
+	volume_stream.begin(cfg);
+	volume_stream.setVolume(volumeLevel);
+
+	// Configure equalizer
+	equalizer = new Equalizer3Bands(volume_stream);
+	
+	// Set audio info first
+	equalizer->setAudioInfo(info);
+
+	auto eq_config = equalizer->defaultConfig();
+	eq_config.sample_rate = 44100;
+	eq_config.channels = 2;
+	eq_config.bits_per_sample = 16;
+
+	// Set EQ band frequencies (Hz)
+	eq_config.freq_low = 500;	// Bass/Mid crossover
+	eq_config.freq_high = 3000; // Mid/Treble crossover
+
+	// Set EQ gains (dB)
+	eq_config.gain_low = bassGain;
+	eq_config.gain_medium = midGain;
+	eq_config.gain_high = trebleGain;
+
+	// Initialize equalizer
+	equalizer->begin(eq_config);
+	Serial.println("===================================");
+	Serial.println("Equalizer initialized with TEST settings:");
+	Serial.printf("  Bass:   %.1f dB (boosted)\n", bassGain);
+	Serial.printf("  Mid:    %.1f dB (cut)\n", midGain);
+	Serial.printf("  Treble: %.1f dB (boosted)\n", trebleGain);
+	Serial.println("Expected sound: Heavy bass, reduced mids, bright highs");
+	Serial.println("===================================");
+
+	// Initialize MP3 player to route audio through equalizer
+	player = new AudioPlayer(source, *equalizer, helix);
+	out = new EncodedAudioStream(equalizer, &helix);
+	Serial.println("MP3 player initialized - audio will route through EQ");
 
 	size_t psramSize = heap_caps_get_total_size(MALLOC_CAP_SPIRAM);
 	Serial.printf("Total PSRAM available: %u bytes\n", psramSize);

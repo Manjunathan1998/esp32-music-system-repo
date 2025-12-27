@@ -73,6 +73,8 @@ bool metadata_updated = false;
 volatile bool playback_status_updated = false;
 uint16_t BTvolume = -1;
 
+
+
 // All internal commands
 enum AppCommand
 {
