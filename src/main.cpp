@@ -28,7 +28,7 @@ Equalizer3Bands *equalizer = nullptr;
 float bassGain = 1.0;	 // Low frequencies (< 500 Hz) - Keep as is
 float midGain = 1.0;	 // Mid frequencies (500 Hz - 3 kHz) - CUT to -12 dB
 float trebleGain = 1.0;	 // High frequencies (> 3 kHz) - CUT to -12 dB
-float volumeLevel = 0.4; // Reduce MP3 volume (0.0 to 1.0, where 1.0 = 100%)
+float volumeLevel = 0.5; // Reduce MP3 volume (0.0 to 1.0, where 1.0 = 100%)
 
 // Audio callback - processes audio data with EQ (for Bluetooth)
 void audio_data_callback(const uint8_t *data, uint32_t len)
@@ -306,17 +306,6 @@ void switchToMainFocusGroup()
 	Serial.println(">>> Main focus group active, a2dp_bluetooth focused");
 }
 
-// Action function implementations
-void action_theater_press(lv_event_t *e)
-{
-	Serial.println(">>> action_theater_press");
-}
-
-void action_car_press(lv_event_t *e)
-{
-	Serial.println(">>> action_car_press");
-}
-
 void display_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p);
 
 // i2s callback for printing audio data from the file
@@ -395,6 +384,27 @@ void stopBtSink()
 	}
 }
 
+void applyEq(float bassGain, float midGain, float trebleGain)
+{
+	Serial.println("aplyEq called");
+
+	// Apply to equalizer in real-time
+	if (equalizer)
+	{
+		auto eq_cfg = equalizer->defaultConfig();
+		eq_cfg.sample_rate = 44100;
+		eq_cfg.channels = 2;
+		eq_cfg.bits_per_sample = 16;
+		eq_cfg.freq_low = 500;
+		eq_cfg.freq_high = 3000;
+		eq_cfg.gain_low = bassGain;
+		eq_cfg.gain_medium = midGain;
+		eq_cfg.gain_high = trebleGain;
+		// equalizer->begin(eq_cfg);
+		// Serial.printf("Theater EQ applied: Bass +%.1fdB, Mid %.1fdB, Treble +%.1fdB\n",
+		// 			  bassGain, midGain, trebleGain);
+	}
+}
 ///////////// RTOS TASKS /////////////
 // main "flow" and events handling
 void appTask(void *param)
@@ -443,10 +453,6 @@ void appTask(void *param)
 							  { switchToScreen(menu_screens[3]); },
 							  NULL);
 				break;
-				// case CMD_BT_STOP:
-				//   // todo add bt stop on encoder double click if curr. screen == bt
-				//   Serial.println("Command BT stop");
-				//   break;
 
 			case CMD_SHUT_DOWN:
 				playMp3File(0);
@@ -461,28 +467,7 @@ void appTask(void *param)
 
 			case CMD_EQ_SET_THEATER:
 				Serial.println(">>> Executing: CMD_EQ_SET_THEATER");
-				Serial.println("EQ: Applying Theater preset (Bass boost + Enhanced highs)");
-				// Theater preset: Enhanced bass and treble for cinematic sound
-				bassGain = 1.0;		// Low frequencies: +6 dB boost
-				midGain = -12.0;	// Mid frequencies: -2 dB (reduce muddiness)
-				trebleGain = -14.0; // High frequencies: +4 dB boost
-
-				// Apply to equalizer in real-time
-				if (equalizer)
-				{
-					auto eq_cfg = equalizer->defaultConfig();
-					eq_cfg.sample_rate = 44100;
-					eq_cfg.channels = 2;
-					eq_cfg.bits_per_sample = 16;
-					eq_cfg.freq_low = 500;
-					eq_cfg.freq_high = 3000;
-					eq_cfg.gain_low = bassGain;
-					eq_cfg.gain_medium = midGain;
-					eq_cfg.gain_high = trebleGain;
-					equalizer->begin(eq_cfg);
-					Serial.printf("Theater EQ applied: Bass +%.1fdB, Mid %.1fdB, Treble +%.1fdB\n",
-								  bassGain, midGain, trebleGain);
-				}
+				applyEq(1.0, 1.0, 4.0);
 
 				// Update button colors and maintain focus
 				lv_async_call([](void *unused)
@@ -498,28 +483,7 @@ void appTask(void *param)
 
 			case CMD_EQ_SET_CAR:
 				Serial.println(">>> Executing: CMD_EQ_SET_CAR");
-				Serial.println("EQ: Applying Car preset (Balanced + Vocal clarity)");
-				// Car preset: Balanced with enhanced mids for vocal clarity
-				bassGain = 1.0;		// Low frequencies: +3 dB moderate boost
-				midGain = -12.0;	// Mid frequencies: +2 dB (vocal clarity)
-				trebleGain = -14.0; // High frequencies: +1 dB subtle boost
-
-				// Apply to equalizer in real-time
-				if (equalizer)
-				{
-					auto eq_cfg = equalizer->defaultConfig();
-					eq_cfg.sample_rate = 44100;
-					eq_cfg.channels = 2;
-					eq_cfg.bits_per_sample = 16;
-					eq_cfg.freq_low = 500;
-					eq_cfg.freq_high = 3000;
-					eq_cfg.gain_low = bassGain;
-					eq_cfg.gain_medium = midGain;
-					eq_cfg.gain_high = trebleGain;
-					equalizer->begin(eq_cfg);
-					Serial.printf("Car EQ applied: Bass +%.1fdB, Mid +%.1fdB, Treble +%.1fdB\n",
-								  bassGain, midGain, trebleGain);
-				}
+				applyEq(1.0, 1.0, 0.1);
 
 				// Update button colors and maintain focus
 				lv_async_call([](void *unused)
@@ -891,9 +855,12 @@ void setup()
 	cfg.pin_bck = I2S_BCK;
 	cfg.pin_ws = I2S_WS;
 	cfg.pin_data = I2S_DATA;
-	cfg.copyFrom(info);
+	cfg.channels = 2;
+	cfg.bits_per_sample = 16;
+	cfg.sample_rate = 44100;
 	cfg.buffer_count = 8;  // can be adjusted to achieve smooth sound
 	cfg.buffer_size = 256; // can be adjusted to achieve smooth sound
+	cfg.copyFrom(info);
 	i2s.begin(cfg);
 	Serial.printf("Free heap after i2s begin: %u bytes\n", esp_get_free_heap_size());
 
