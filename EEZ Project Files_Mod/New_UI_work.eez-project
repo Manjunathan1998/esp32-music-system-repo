@@ -108,7 +108,24 @@
     "structures": [],
     "enums": []
   },
-  "actions": [],
+  "actions": [
+    {
+      "objID": "33a2fd1a-e90a-44ff-baee-f46392c98c66",
+      "components": [],
+      "connectionLines": [],
+      "localVariables": [],
+      "userProperties": [],
+      "name": "theater_press"
+    },
+    {
+      "objID": "8e1a59b3-1541-411d-c8e3-a08ff0437b15",
+      "components": [],
+      "connectionLines": [],
+      "localVariables": [],
+      "userProperties": [],
+      "name": "car_press"
+    }
+  ],
   "userPages": [
     {
       "objID": "4b40eba7-b31a-468a-b887-11dfd0b6637f",
@@ -2208,7 +2225,15 @@
                     "childStyles": []
                   },
                   "timeline": [],
-                  "eventHandlers": [],
+                  "eventHandlers": [
+                    {
+                      "objID": "cce2c12b-f8f5-4dbe-ece1-c52c6aa668b5",
+                      "eventName": "PRESSED",
+                      "handlerType": "action",
+                      "action": "theater_press",
+                      "userData": 0
+                    }
+                  ],
                   "identifier": "btn_theater",
                   "leftUnit": "px",
                   "topUnit": "px",
@@ -2284,6 +2309,9 @@
                       "MAIN": {
                         "DEFAULT": {
                           "bg_color": "#0292a0"
+                        },
+                        "PRESSED": {
+                          "bg_color": "#d6810f"
                         }
                       }
                     }
@@ -2307,7 +2335,15 @@
                     "childStyles": []
                   },
                   "timeline": [],
-                  "eventHandlers": [],
+                  "eventHandlers": [
+                    {
+                      "objID": "2aab7592-3c40-4358-bfce-a65ff87ea88b",
+                      "eventName": "PRESSED",
+                      "handlerType": "action",
+                      "action": "car_press",
+                      "userData": 0
+                    }
+                  ],
                   "identifier": "btn_car",
                   "leftUnit": "px",
                   "topUnit": "px",
@@ -2383,6 +2419,9 @@
                       "MAIN": {
                         "DEFAULT": {
                           "bg_color": "#0292a0"
+                        },
+                        "PRESSED": {
+                          "bg_color": "#d6810f"
                         }
                       }
                     }

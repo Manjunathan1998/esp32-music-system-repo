@@ -25,10 +25,10 @@ VolumeStream volume_stream(i2s);
 // EQ setup
 Equalizer3Bands *equalizer = nullptr;
 // EQ settings (in dB) - Testing with cuts
-float bassGain = 0.0;	  // Low frequencies (< 500 Hz) - Keep as is
-float midGain = 1.0;	  // Mid frequencies (500 Hz - 3 kHz) - CUT to -12 dB
-float trebleGain = -12.0; // High frequencies (> 3 kHz) - CUT to -12 dB
-float volumeLevel = 1.0;  // Reduce MP3 volume (0.0 to 1.0, where 1.0 = 100%)
+float bassGain = 1.0;	 // Low frequencies (< 500 Hz) - Keep as is
+float midGain = 1.0;	 // Mid frequencies (500 Hz - 3 kHz) - CUT to -12 dB
+float trebleGain = 1.0;	 // High frequencies (> 3 kHz) - CUT to -12 dB
+float volumeLevel = 0.4; // Reduce MP3 volume (0.0 to 1.0, where 1.0 = 100%)
 
 // Audio callback - processes audio data with EQ (for Bluetooth)
 void audio_data_callback(const uint8_t *data, uint32_t len)
@@ -306,6 +306,17 @@ void switchToMainFocusGroup()
 	Serial.println(">>> Main focus group active, a2dp_bluetooth focused");
 }
 
+// Action function implementations
+void action_theater_press(lv_event_t *e)
+{
+	Serial.println(">>> action_theater_press");
+}
+
+void action_car_press(lv_event_t *e)
+{
+	Serial.println(">>> action_car_press");
+}
+
 void display_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p);
 
 // i2s callback for printing audio data from the file
@@ -375,6 +386,7 @@ void stopBtSink()
 		Serial.println("Stopping A2DP sink...");
 		a2dp_sink.disconnect();
 		vTaskDelay(600 / portTICK_PERIOD_MS);
+		btSinkActive = false;
 		Serial.println("Sink stopped");
 	}
 	else
@@ -407,7 +419,7 @@ void appTask(void *param)
 
 				playMp3File(2); // bt pair sound
 				vTaskDelay(600 / portTICK_PERIOD_MS);
-				i2s.end();
+				// i2s.end();
 				vTaskDelay(600 / portTICK_PERIOD_MS);
 				startBtSink();
 				lv_async_call([](void *unused)
@@ -471,6 +483,17 @@ void appTask(void *param)
 					Serial.printf("Theater EQ applied: Bass +%.1fdB, Mid %.1fdB, Treble +%.1fdB\n",
 								  bassGain, midGain, trebleGain);
 				}
+
+				// Update button colors and maintain focus
+				lv_async_call([](void *unused)
+							  {
+					// Set Theater button to green (active)
+					lv_obj_set_style_bg_color(objects.btn_theater, lv_color_hex(0x00FF00), LV_PART_MAIN | LV_STATE_DEFAULT);
+					// Reset Car button to default color
+					lv_obj_set_style_bg_color(objects.btn_car, lv_color_hex(0xff0292a0), LV_PART_MAIN | LV_STATE_DEFAULT);
+					// Keep focus on Theater button
+					lv_group_focus_obj(objects.btn_theater); },
+							  NULL);
 				break;
 
 			case CMD_EQ_SET_CAR:
@@ -497,6 +520,17 @@ void appTask(void *param)
 					Serial.printf("Car EQ applied: Bass +%.1fdB, Mid +%.1fdB, Treble +%.1fdB\n",
 								  bassGain, midGain, trebleGain);
 				}
+
+				// Update button colors and maintain focus
+				lv_async_call([](void *unused)
+							  {
+					// Set Car button to green (active)
+					lv_obj_set_style_bg_color(objects.btn_car, lv_color_hex(0x00FF00), LV_PART_MAIN | LV_STATE_DEFAULT);
+					// Reset Theater button to default color
+					lv_obj_set_style_bg_color(objects.btn_theater, lv_color_hex(0xff0292a0), LV_PART_MAIN | LV_STATE_DEFAULT);
+					// Keep focus on Car button
+					lv_group_focus_obj(objects.btn_car); },
+							  NULL);
 				break;
 
 			default:
@@ -553,10 +587,11 @@ void serialTask(void *param)
 				float newGain = cmdValue.toFloat();
 				bassGain = newGain;
 				// Serial.printf("Bass set to: %.1f dB\n", bassGain);
-				
+
 				// Apply immediately
-				if (equalizer) {
-					equalizer->setAudioInfo(info);  // Ensure audio info is set
+				if (equalizer)
+				{
+					equalizer->setAudioInfo(info); // Ensure audio info is set
 					auto eq_cfg = equalizer->defaultConfig();
 					eq_cfg.sample_rate = 44100;
 					eq_cfg.channels = 2;
@@ -575,10 +610,11 @@ void serialTask(void *param)
 				float newGain = cmdValue.toFloat();
 				midGain = newGain;
 				// Serial.printf("Mid set to: %.1f dB\n", midGain);
-				
+
 				// Apply immediately
-				if (equalizer) {
-					equalizer->setAudioInfo(info);  // Ensure audio info is set
+				if (equalizer)
+				{
+					equalizer->setAudioInfo(info); // Ensure audio info is set
 					auto eq_cfg = equalizer->defaultConfig();
 					eq_cfg.sample_rate = 44100;
 					eq_cfg.channels = 2;
@@ -597,10 +633,11 @@ void serialTask(void *param)
 				float newGain = cmdValue.toFloat();
 				trebleGain = newGain;
 				// Serial.printf("Treble set to: %.1f dB\n", trebleGain);
-				
+
 				// Apply immediately
-				if (equalizer) {
-					equalizer->setAudioInfo(info);  // Ensure audio info is set
+				if (equalizer)
+				{
+					equalizer->setAudioInfo(info); // Ensure audio info is set
 					auto eq_cfg = equalizer->defaultConfig();
 					eq_cfg.sample_rate = 44100;
 					eq_cfg.channels = 2;
@@ -679,6 +716,7 @@ void encoderTask(void *param)
 
 		if (button.fell())
 		{
+			Serial.println("Button fell");
 			// Button just pressed
 			pressStartTime = millis();
 			isPressed = true;
@@ -687,6 +725,7 @@ void encoderTask(void *param)
 		// Button held long enough for shutting down
 		if (isPressed && (millis() - pressStartTime >= ENCODER_BTN_HOLD_TIME))
 		{
+			Serial.println("Long press");
 			AppCommand cmd = CMD_SHUT_DOWN;
 			xQueueSend(appCommandQueue, &cmd, 0);
 		}
@@ -715,43 +754,14 @@ void encoderTask(void *param)
 		if (waitingForSecondClick && (millis() - lastClickTime >= doubleClickThreshold))
 		{
 			// single click
-			lv_obj_t *focused = lv_group_get_focused(focus_group);
 			AppCommand cmd = CMD_NONE;
-			if (focused)
-			{
-				for (int i = 0; i < 4; ++i)
-				{
-					if (focused == menu_buttons[i])
-					{
-						switch (i)
-						{
-						case 0:
-							cmd = CMD_SWITCH_TO_SCR_BT;
-							Serial.println("CMD_SWITCH_TO_SCR_BT");
-							break;
-						case 1:
-							cmd = CMD_SWITCH_TO_SCR_WIFI_RADIO;
-							Serial.println("CMD_SWITCH_TO_SCR_WIFI");
-							break;
-						case 2:
-							cmd = CMD_SWITCH_TO_SCR_EQ;
-							Serial.println("CMD_SWITCH_TO_SCR_EQ");
-							break;
-						case 3:
-							cmd = CMD_SWITCH_TO_SCR_SETTINGS;
-							Serial.println("CMD_SWITCH_TO_SCR_SETTINGS");
-							break;
-						}
-						break;
-					}
-				}
-			}
 
-			// If no main button matched, check EQ buttons
-			if (cmd == CMD_NONE)
+			// Check if we're on the EQ page first
+			if (current_screen == objects.equalizer_page)
 			{
-				focused = lv_group_get_focused(focus_group_eq);
-				Serial.print("DEBUG: Focused object from EQ focus_group_eq = ");
+				// We're on EQ page, check EQ buttons only
+				lv_obj_t *focused = lv_group_get_focused(focus_group_eq);
+				Serial.print("DEBUG: On EQ page, focused object = ");
 				Serial.println((uint32_t)focused, HEX);
 
 				if (focused)
@@ -773,6 +783,40 @@ void encoderTask(void *param)
 							case 1:
 								cmd = CMD_EQ_SET_CAR;
 								Serial.println("CMD_EQ_SET_CAR");
+								break;
+							}
+							break;
+						}
+					}
+				}
+			}
+			else
+			{
+				// We're on main menu, check main menu buttons
+				lv_obj_t *focused = lv_group_get_focused(focus_group);
+				if (focused)
+				{
+					for (int i = 0; i < 4; ++i)
+					{
+						if (focused == menu_buttons[i])
+						{
+							switch (i)
+							{
+							case 0:
+								cmd = CMD_SWITCH_TO_SCR_BT;
+								Serial.println("CMD_SWITCH_TO_SCR_BT");
+								break;
+							case 1:
+								cmd = CMD_SWITCH_TO_SCR_WIFI_RADIO;
+								Serial.println("CMD_SWITCH_TO_SCR_WIFI");
+								break;
+							case 2:
+								cmd = CMD_SWITCH_TO_SCR_EQ;
+								Serial.println("CMD_SWITCH_TO_SCR_EQ");
+								break;
+							case 3:
+								cmd = CMD_SWITCH_TO_SCR_SETTINGS;
+								Serial.println("CMD_SWITCH_TO_SCR_SETTINGS");
 								break;
 							}
 							break;
@@ -858,7 +902,7 @@ void setup()
 
 	// Configure equalizer
 	equalizer = new Equalizer3Bands(volume_stream);
-	
+
 	// Set audio info first
 	equalizer->setAudioInfo(info);
 

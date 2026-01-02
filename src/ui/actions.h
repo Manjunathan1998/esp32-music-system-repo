@@ -7,6 +7,8 @@
 extern "C" {
 #endif
 
+extern void action_theater_press(lv_event_t * e);
+extern void action_car_press(lv_event_t * e);
 
 
 #ifdef __cplusplus

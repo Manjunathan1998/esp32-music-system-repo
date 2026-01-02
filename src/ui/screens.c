@@ -551,7 +551,9 @@ void create_screen_equalizer_page() {
                     objects.btn_theater = obj;
                     lv_obj_set_pos(obj, 30, 41);
                     lv_obj_set_size(obj, 100, 24);
+                    lv_obj_add_event_cb(obj, action_theater_press, LV_EVENT_PRESSED, (void *)0);
                     lv_obj_set_style_bg_color(obj, lv_color_hex(0xff0292a0), LV_PART_MAIN | LV_STATE_DEFAULT);
+                    lv_obj_set_style_bg_color(obj, lv_color_hex(0xffd6810f), LV_PART_MAIN | LV_STATE_PRESSED);
                     {
                         lv_obj_t *parent_obj = obj;
                         {
@@ -574,7 +576,9 @@ void create_screen_equalizer_page() {
                     objects.btn_car = obj;
                     lv_obj_set_pos(obj, 30, 78);
                     lv_obj_set_size(obj, 100, 24);
+                    lv_obj_add_event_cb(obj, action_car_press, LV_EVENT_PRESSED, (void *)0);
                     lv_obj_set_style_bg_color(obj, lv_color_hex(0xff0292a0), LV_PART_MAIN | LV_STATE_DEFAULT);
+                    lv_obj_set_style_bg_color(obj, lv_color_hex(0xffd6810f), LV_PART_MAIN | LV_STATE_PRESSED);
                     {
                         lv_obj_t *parent_obj = obj;
                         {
