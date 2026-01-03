@@ -68,6 +68,8 @@
           },
           {
             "type": "border",
+            "selected": 0,
+            "size": 141.09375,
             "location": "bottom",
             "children": [
               {
@@ -114,12 +116,13 @@
             {
               "type": "row",
               "id": "#3de53814-5c6f-4de3-bff8-2b5fcc8e7319",
-              "weight": 15,
+              "weight": 25.924018987812683,
               "children": [
                 {
                   "type": "tabset",
                   "id": "#697dc9ad-5f74-409f-a4fc-bffd84492a94",
                   "weight": 1,
+                  "selected": 2,
                   "enableClose": false,
                   "children": [
                     {
@@ -146,7 +149,8 @@
                       "enableClose": false,
                       "icon": "material:code"
                     }
-                  ]
+                  ],
+                  "active": true
                 },
                 {
                   "type": "tabset",
@@ -185,7 +189,7 @@
             {
               "type": "tabset",
               "id": "EDITORS",
-              "weight": 65,
+              "weight": 41.090906385321645,
               "selected": 1,
               "enableDeleteWhenEmpty": false,
               "enableClose": false,
@@ -213,13 +217,12 @@
                   },
                   "icon": "svg:page"
                 }
-              ],
-              "active": true
+              ]
             },
             {
               "type": "row",
               "id": "#66823075-4d92-4158-9612-ac0e025536ea",
-              "weight": 20,
+              "weight": 32.985074626865675,
               "children": [
                 {
                   "type": "tabset",
@@ -1010,7 +1013,9 @@
         "0": {
           "0": {
             "0": {},
-            "1": {}
+            "1": {
+              "$selected": true
+            }
           },
           "2": {
             "0": {},
@@ -1111,7 +1116,7 @@
   "logsPanelFilter": "all",
   "selectedStylePropertyName": "",
   "lvglPart": "MAIN",
-  "lvglState": "DEFAULT",
+  "lvglState": "PRESSED",
   "lvglExpandedPropertiesGroup": [
     "BACKGROUND",
     "MISCELLANEOUS",

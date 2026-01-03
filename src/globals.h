@@ -62,9 +62,6 @@ bool startupDone = false;
 bool btSinkActive = false;
 static lv_obj_t *current_screen = NULL;
 String batteryCharge = "0";
-// String playbackStatus = "Stopped";
-// const char *trackName;
-// const char *artistName;
 
 char artistName[128] = {0};
 char trackName[128] = {0};

@@ -24,11 +24,11 @@ VolumeStream volume_stream(i2s);
 
 // EQ setup
 Equalizer3Bands *equalizer = nullptr;
-// EQ settings (in dB) - Testing with cuts
-float bassGain = 1.0;	 // Low frequencies (< 500 Hz) - Keep as is
-float midGain = 1.0;	 // Mid frequencies (500 Hz - 3 kHz) - CUT to -12 dB
-float trebleGain = 1.0;	 // High frequencies (> 3 kHz) - CUT to -12 dB
-float volumeLevel = 0.5; // Reduce MP3 volume (0.0 to 1.0, where 1.0 = 100%)
+// Initial EQ settings
+float bassGain = 1.0;
+float midGain = 1.0;
+float trebleGain = 1.0;
+float volumeLevel = 0.5;
 
 // Audio callback - processes audio data with EQ (for Bluetooth)
 void audio_data_callback(const uint8_t *data, uint32_t len)
@@ -357,6 +357,25 @@ void startBtSink()
 		i2s.begin(cfg);
 	}
 
+	// Now that I2S is active, apply the stored EQ settings
+	if (equalizer)
+	{
+		Serial.println("Applying EQ for BT mode...");
+		Serial.printf("EQ values - Bass: %.1f, Mid: %.1f, Treble: %.1f\n", bassGain, midGain, trebleGain);
+		equalizer->setAudioInfo(info);
+		auto eq_cfg = equalizer->defaultConfig();
+		eq_cfg.sample_rate = 44100;
+		eq_cfg.channels = 2;
+		eq_cfg.bits_per_sample = 16;
+		eq_cfg.freq_low = 500;
+		eq_cfg.freq_high = 3000;
+		eq_cfg.gain_low = bassGain;
+		eq_cfg.gain_medium = midGain;
+		eq_cfg.gain_high = trebleGain;
+		equalizer->begin(eq_cfg);
+		Serial.println("EQ applied");
+	}
+
 	a2dp_sink.set_avrc_metadata_callback(avrc_metadata_callback);
 	a2dp_sink.set_avrc_rn_playstatus_callback(avrc_playback_status_changed);
 
@@ -391,6 +410,18 @@ void applyEq(float bassGain, float midGain, float trebleGain)
 	// Apply to equalizer in real-time
 	if (equalizer)
 	{
+		// CRITICAL: Only apply if I2S is active (audio is playing)
+		// Calling begin() on idle I2S corrupts equalizer state
+		if (!i2s.isActive())
+		{
+			Serial.println("WARNING: I2S not active, storing EQ values but NOT applying");
+			// Just store the values for later
+			::bassGain = bassGain;
+			::midGain = midGain;
+			::trebleGain = trebleGain;
+			return;
+		}
+
 		auto eq_cfg = equalizer->defaultConfig();
 		eq_cfg.sample_rate = 44100;
 		eq_cfg.channels = 2;
@@ -400,9 +431,8 @@ void applyEq(float bassGain, float midGain, float trebleGain)
 		eq_cfg.gain_low = bassGain;
 		eq_cfg.gain_medium = midGain;
 		eq_cfg.gain_high = trebleGain;
-		// equalizer->begin(eq_cfg);
-		// Serial.printf("Theater EQ applied: Bass +%.1fdB, Mid %.1fdB, Treble +%.1fdB\n",
-		// 			  bassGain, midGain, trebleGain);
+		equalizer->begin(eq_cfg);
+		Serial.println("EQ configuration applied (I2S active)");
 	}
 }
 ///////////// RTOS TASKS /////////////
@@ -424,8 +454,25 @@ void appTask(void *param)
                         stopBtSink(); },
 							  NULL);
 				break;
-
 			case CMD_SWITCH_TO_SCR_BT:
+
+				// CRITICAL: Reinitialize equalizer before MP3/BT to ensure clean state
+				// Menu EQ changes may leave equalizer in unstable state
+				if (equalizer)
+				{
+					Serial.println("Reinitializing equalizer before BT mode...");
+					equalizer->setAudioInfo(info);
+					auto eq_cfg = equalizer->defaultConfig();
+					eq_cfg.sample_rate = 44100;
+					eq_cfg.channels = 2;
+					eq_cfg.bits_per_sample = 16;
+					eq_cfg.freq_low = 500;
+					eq_cfg.freq_high = 3000;
+					eq_cfg.gain_low = bassGain;
+					eq_cfg.gain_medium = midGain;
+					eq_cfg.gain_high = trebleGain;
+					equalizer->begin(eq_cfg);
+				}
 
 				playMp3File(2); // bt pair sound
 				vTaskDelay(600 / portTICK_PERIOD_MS);
