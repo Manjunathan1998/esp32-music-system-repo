@@ -50,6 +50,10 @@ typedef struct _objects_t {
     lv_obj_t *l_theater;
     lv_obj_t *btn_car;
     lv_obj_t *l_car;
+    lv_obj_t *btn_flat;
+    lv_obj_t *l_flat;
+    lv_obj_t *btn_cinema;
+    lv_obj_t *l_cinema;
     lv_obj_t *eq_panel;
     lv_obj_t *battery_skeleton_3;
     lv_obj_t *ions_left_69;

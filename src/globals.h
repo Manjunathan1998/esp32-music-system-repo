@@ -70,8 +70,6 @@ bool metadata_updated = false;
 volatile bool playback_status_updated = false;
 uint16_t BTvolume = -1;
 
-
-
 // All internal commands
 enum AppCommand
 {
@@ -86,7 +84,9 @@ enum AppCommand
     CMD_BAT_UPDATE,
     CMD_SHUT_DOWN,
     CMD_EQ_SET_THEATER,
-    CMD_EQ_SET_CAR
+    CMD_EQ_SET_CAR,
+    CMD_EQ_SET_CINEMA,
+    CMD_EQ_SET_FLAT
 };
 
 // 1 - Hello sound; 0 - Bye sound; 2 - bt pair ready
@@ -114,7 +114,7 @@ lv_obj_t *menu_buttons[4];
 lv_obj_t *menu_screens[4];
 
 lv_group_t *focus_group_eq;
-lv_obj_t *eq_buttons[2];
+lv_obj_t *eq_buttons[4];
 
 // Button variables
 Bounce button = Bounce();

@@ -149,8 +149,7 @@
                       "enableClose": false,
                       "icon": "material:code"
                     }
-                  ],
-                  "active": true
+                  ]
                 },
                 {
                   "type": "tabset",
@@ -217,7 +216,8 @@
                   },
                   "icon": "svg:page"
                 }
-              ]
+              ],
+              "active": true
             },
             {
               "type": "row",
@@ -1013,9 +1013,9 @@
         "0": {
           "0": {
             "0": {},
-            "1": {
-              "$selected": true
-            }
+            "1": {},
+            "2": {},
+            "3": {}
           },
           "2": {
             "0": {},
@@ -1116,7 +1116,7 @@
   "logsPanelFilter": "all",
   "selectedStylePropertyName": "",
   "lvglPart": "MAIN",
-  "lvglState": "PRESSED",
+  "lvglState": "DEFAULT",
   "lvglExpandedPropertiesGroup": [
     "BACKGROUND",
     "MISCELLANEOUS",

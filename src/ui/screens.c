@@ -549,8 +549,8 @@ void create_screen_equalizer_page() {
                     // btn_theater
                     lv_obj_t *obj = lv_btn_create(parent_obj);
                     objects.btn_theater = obj;
-                    lv_obj_set_pos(obj, 30, 41);
-                    lv_obj_set_size(obj, 100, 24);
+                    lv_obj_set_pos(obj, 30, 34);
+                    lv_obj_set_size(obj, 100, 16);
                     lv_obj_set_style_bg_color(obj, lv_color_hex(0xff0292a0), LV_PART_MAIN | LV_STATE_DEFAULT);
                     lv_obj_set_style_bg_color(obj, lv_color_hex(0xffd6810f), LV_PART_MAIN | LV_STATE_PRESSED);
                     {
@@ -573,8 +573,8 @@ void create_screen_equalizer_page() {
                     // btn_car
                     lv_obj_t *obj = lv_btn_create(parent_obj);
                     objects.btn_car = obj;
-                    lv_obj_set_pos(obj, 30, 78);
-                    lv_obj_set_size(obj, 100, 24);
+                    lv_obj_set_pos(obj, 30, 56);
+                    lv_obj_set_size(obj, 100, 16);
                     lv_obj_set_style_bg_color(obj, lv_color_hex(0xff0292a0), LV_PART_MAIN | LV_STATE_DEFAULT);
                     lv_obj_set_style_bg_color(obj, lv_color_hex(0xffd6810f), LV_PART_MAIN | LV_STATE_PRESSED);
                     {
@@ -590,6 +590,54 @@ void create_screen_equalizer_page() {
                             lv_obj_set_style_align(obj, LV_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
                             lv_obj_set_style_text_letter_space(obj, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
                             lv_label_set_text(obj, "Car");
+                        }
+                    }
+                }
+                {
+                    // btn_flat
+                    lv_obj_t *obj = lv_btn_create(parent_obj);
+                    objects.btn_flat = obj;
+                    lv_obj_set_pos(obj, 30, 100);
+                    lv_obj_set_size(obj, 100, 16);
+                    lv_obj_set_style_bg_color(obj, lv_color_hex(0xff0292a0), LV_PART_MAIN | LV_STATE_DEFAULT);
+                    lv_obj_set_style_bg_color(obj, lv_color_hex(0xffd6810f), LV_PART_MAIN | LV_STATE_PRESSED);
+                    {
+                        lv_obj_t *parent_obj = obj;
+                        {
+                            // l_flat
+                            lv_obj_t *obj = lv_label_create(parent_obj);
+                            objects.l_flat = obj;
+                            lv_obj_set_pos(obj, 0, 0);
+                            lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+                            lv_label_set_long_mode(obj, LV_LABEL_LONG_DOT);
+                            lv_label_set_recolor(obj, true);
+                            lv_obj_set_style_align(obj, LV_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+                            lv_obj_set_style_text_letter_space(obj, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
+                            lv_label_set_text(obj, "Flat");
+                        }
+                    }
+                }
+                {
+                    // btn_cinema
+                    lv_obj_t *obj = lv_btn_create(parent_obj);
+                    objects.btn_cinema = obj;
+                    lv_obj_set_pos(obj, 30, 78);
+                    lv_obj_set_size(obj, 100, 16);
+                    lv_obj_set_style_bg_color(obj, lv_color_hex(0xff0292a0), LV_PART_MAIN | LV_STATE_DEFAULT);
+                    lv_obj_set_style_bg_color(obj, lv_color_hex(0xffd6810f), LV_PART_MAIN | LV_STATE_PRESSED);
+                    {
+                        lv_obj_t *parent_obj = obj;
+                        {
+                            // l_cinema
+                            lv_obj_t *obj = lv_label_create(parent_obj);
+                            objects.l_cinema = obj;
+                            lv_obj_set_pos(obj, 0, 0);
+                            lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+                            lv_label_set_long_mode(obj, LV_LABEL_LONG_DOT);
+                            lv_label_set_recolor(obj, true);
+                            lv_obj_set_style_align(obj, LV_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+                            lv_obj_set_style_text_letter_space(obj, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
+                            lv_label_set_text(obj, "Cinema");
                         }
                     }
                 }

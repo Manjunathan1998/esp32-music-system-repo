@@ -280,12 +280,30 @@ void setupEncoderFocusGroup()
 void setupEncoderFocusGroupEQ()
 {
 	focus_group_eq = lv_group_create();
+	lv_group_set_wrap(focus_group_eq, true); // Enable wrapping to cycle through all buttons
 
 	lv_group_add_obj(focus_group_eq, objects.btn_theater);
 	lv_group_add_obj(focus_group_eq, objects.btn_car);
+	lv_group_add_obj(focus_group_eq, objects.btn_cinema);
+	lv_group_add_obj(focus_group_eq, objects.btn_flat);
 
 	lv_obj_add_flag(objects.btn_theater, LV_OBJ_FLAG_SCROLL_ON_FOCUS | LV_OBJ_FLAG_CLICKABLE);
 	lv_obj_add_flag(objects.btn_car, LV_OBJ_FLAG_SCROLL_ON_FOCUS | LV_OBJ_FLAG_CLICKABLE);
+	lv_obj_add_flag(objects.btn_cinema, LV_OBJ_FLAG_SCROLL_ON_FOCUS | LV_OBJ_FLAG_CLICKABLE);
+	lv_obj_add_flag(objects.btn_flat, LV_OBJ_FLAG_SCROLL_ON_FOCUS | LV_OBJ_FLAG_CLICKABLE);
+
+	// Add focus styling for all buttons
+	lv_obj_set_style_outline_width(objects.btn_theater, 3, LV_PART_MAIN | LV_STATE_FOCUSED);
+	lv_obj_set_style_outline_color(objects.btn_theater, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_FOCUSED);
+
+	lv_obj_set_style_outline_width(objects.btn_car, 3, LV_PART_MAIN | LV_STATE_FOCUSED);
+	lv_obj_set_style_outline_color(objects.btn_car, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_FOCUSED);
+
+	lv_obj_set_style_outline_width(objects.btn_cinema, 3, LV_PART_MAIN | LV_STATE_FOCUSED);
+	lv_obj_set_style_outline_color(objects.btn_cinema, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_FOCUSED);
+
+	lv_obj_set_style_outline_width(objects.btn_flat, 3, LV_PART_MAIN | LV_STATE_FOCUSED);
+	lv_obj_set_style_outline_color(objects.btn_flat, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_FOCUSED);
 
 	lv_group_focus_obj(objects.btn_theater); // focus the first button
 }
@@ -521,8 +539,10 @@ void appTask(void *param)
 							  {
 					// Set Theater button to green (active)
 					lv_obj_set_style_bg_color(objects.btn_theater, lv_color_hex(0x00FF00), LV_PART_MAIN | LV_STATE_DEFAULT);
-					// Reset Car button to default color
+					// Reset other buttons to default color
 					lv_obj_set_style_bg_color(objects.btn_car, lv_color_hex(0xff0292a0), LV_PART_MAIN | LV_STATE_DEFAULT);
+					lv_obj_set_style_bg_color(objects.btn_cinema, lv_color_hex(0xff0292a0), LV_PART_MAIN | LV_STATE_DEFAULT);
+					lv_obj_set_style_bg_color(objects.btn_flat, lv_color_hex(0xff0292a0), LV_PART_MAIN | LV_STATE_DEFAULT);
 					// Keep focus on Theater button
 					lv_group_focus_obj(objects.btn_theater); },
 							  NULL);
@@ -537,10 +557,48 @@ void appTask(void *param)
 							  {
 					// Set Car button to green (active)
 					lv_obj_set_style_bg_color(objects.btn_car, lv_color_hex(0x00FF00), LV_PART_MAIN | LV_STATE_DEFAULT);
-					// Reset Theater button to default color
+					// Reset other buttons to default color
 					lv_obj_set_style_bg_color(objects.btn_theater, lv_color_hex(0xff0292a0), LV_PART_MAIN | LV_STATE_DEFAULT);
+					lv_obj_set_style_bg_color(objects.btn_cinema, lv_color_hex(0xff0292a0), LV_PART_MAIN | LV_STATE_DEFAULT);
+					lv_obj_set_style_bg_color(objects.btn_flat, lv_color_hex(0xff0292a0), LV_PART_MAIN | LV_STATE_DEFAULT);
 					// Keep focus on Car button
 					lv_group_focus_obj(objects.btn_car); },
+							  NULL);
+				break;
+
+			case CMD_EQ_SET_CINEMA:
+				Serial.println(">>> Executing: CMD_EQ_SET_CINEMA");
+				applyEq(1.5, 1.0, 1.2);
+
+				// Update button colors and maintain focus
+				lv_async_call([](void *unused)
+							  {
+					// Set Cinema button to green (active)
+					lv_obj_set_style_bg_color(objects.btn_cinema, lv_color_hex(0x00FF00), LV_PART_MAIN | LV_STATE_DEFAULT);
+					// Reset other buttons to default color
+					lv_obj_set_style_bg_color(objects.btn_theater, lv_color_hex(0xff0292a0), LV_PART_MAIN | LV_STATE_DEFAULT);
+					lv_obj_set_style_bg_color(objects.btn_car, lv_color_hex(0xff0292a0), LV_PART_MAIN | LV_STATE_DEFAULT);
+					lv_obj_set_style_bg_color(objects.btn_flat, lv_color_hex(0xff0292a0), LV_PART_MAIN | LV_STATE_DEFAULT);
+					// Keep focus on Cinema button
+					lv_group_focus_obj(objects.btn_cinema); },
+							  NULL);
+				break;
+
+			case CMD_EQ_SET_FLAT:
+				Serial.println(">>> Executing: CMD_EQ_SET_FLAT");
+				applyEq(1.0, 1.0, 1.0);
+
+				// Update button colors and maintain focus
+				lv_async_call([](void *unused)
+							  {
+					// Set Flat button to green (active)
+					lv_obj_set_style_bg_color(objects.btn_flat, lv_color_hex(0x00FF00), LV_PART_MAIN | LV_STATE_DEFAULT);
+					// Reset other buttons to default color
+					lv_obj_set_style_bg_color(objects.btn_theater, lv_color_hex(0xff0292a0), LV_PART_MAIN | LV_STATE_DEFAULT);
+					lv_obj_set_style_bg_color(objects.btn_car, lv_color_hex(0xff0292a0), LV_PART_MAIN | LV_STATE_DEFAULT);
+					lv_obj_set_style_bg_color(objects.btn_cinema, lv_color_hex(0xff0292a0), LV_PART_MAIN | LV_STATE_DEFAULT);
+					// Keep focus on Flat button
+					lv_group_focus_obj(objects.btn_flat); },
 							  NULL);
 				break;
 
@@ -777,7 +835,7 @@ void encoderTask(void *param)
 
 				if (focused)
 				{
-					for (int i = 0; i < 2; ++i)
+					for (int i = 0; i < 4; ++i)
 					{
 						if (focused == eq_buttons[i])
 						{
@@ -794,6 +852,14 @@ void encoderTask(void *param)
 							case 1:
 								cmd = CMD_EQ_SET_CAR;
 								Serial.println("CMD_EQ_SET_CAR");
+								break;
+							case 2:
+								cmd = CMD_EQ_SET_CINEMA;
+								Serial.println("CMD_EQ_SET_CINEMA");
+								break;
+							case 3:
+								cmd = CMD_EQ_SET_FLAT;
+								Serial.println("CMD_EQ_SET_FLAT");
 								break;
 							}
 							break;
@@ -1030,6 +1096,8 @@ void setup()
 
 	eq_buttons[0] = objects.btn_theater;
 	eq_buttons[1] = objects.btn_car;
+	eq_buttons[2] = objects.btn_cinema;
+	eq_buttons[3] = objects.btn_flat;
 
 	Serial.println("Focus group ready");
 
