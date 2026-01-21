@@ -13,6 +13,7 @@ typedef struct _objects_t {
     lv_obj_t *aws_connect;
     lv_obj_t *equalizer_page;
     lv_obj_t *settings_page;
+    lv_obj_t *bt_devices_page;
     lv_obj_t *main_list_holder;
     lv_obj_t *a2dp_bluetooth;
     lv_obj_t *l_a2dp;
@@ -60,11 +61,19 @@ typedef struct _objects_t {
     lv_obj_t *ions_left_23;
     lv_obj_t *ions_left_65;
     lv_obj_t *settings_container;
+    lv_obj_t *btn_bt_devices;
+    lv_obj_t *l_bt_devices;
     lv_obj_t *settings_panel;
     lv_obj_t *battery_skeleton_4;
     lv_obj_t *ions_left_24;
     lv_obj_t *ions_left_67;
     lv_obj_t *ions_left_68;
+    lv_obj_t *settings_container_1;
+    lv_obj_t *battery_skeleton_5;
+    lv_obj_t *ions_left_25;
+    lv_obj_t *ions_left_70;
+    lv_obj_t *ions_left_71;
+    lv_obj_t *bt_dev_count;
 } objects_t;
 
 extern objects_t objects;
@@ -75,6 +84,7 @@ enum ScreensEnum {
     SCREEN_ID_AWS_CONNECT = 3,
     SCREEN_ID_EQUALIZER_PAGE = 4,
     SCREEN_ID_SETTINGS_PAGE = 5,
+    SCREEN_ID_BT_DEVICES_PAGE = 6,
 };
 
 void create_screen_main();
@@ -91,6 +101,9 @@ void tick_screen_equalizer_page();
 
 void create_screen_settings_page();
 void tick_screen_settings_page();
+
+void create_screen_bt_devices_page();
+void tick_screen_bt_devices_page();
 
 void tick_screen_by_id(enum ScreensEnum screenId);
 void tick_screen(int screen_index);

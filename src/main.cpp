@@ -3,6 +3,7 @@
 #include "esp_bt.h"
 
 #include "BluetoothA2DPSink.h"
+#include "BluetoothDeviceManager.h"
 #include "utilities.h"
 #include "./ui/ui.h"
 #include "./ui/actions.h"
@@ -43,6 +44,9 @@ AudioSourceSPIFFS source("/", ".mp3");
 AudioPlayer *player = nullptr;	   // Will be initialized in setup()
 EncodedAudioStream *out = nullptr; // Will be initialized in setup()
 BluetoothA2DPSink a2dp_sink(i2s);
+
+// Bluetooth device manager
+BluetoothDeviceManager btDeviceManager;
 
 // LVGL buffer
 #if defined(NO_PSRAM)
@@ -138,6 +142,43 @@ void avrc_playback_status_changed(esp_avrc_playback_stat_t playback)
 	}
 	playbackStatus[sizeof(playbackStatus) - 1] = '\0'; // overflow protection
 	playback_status_updated = true;
+}
+
+// Bluetooth connection state callback
+void bt_connection_state_changed(esp_a2d_connection_state_t state, void *ptr)
+{
+	Serial.println("========================================");
+	if (state == ESP_A2D_CONNECTION_STATE_CONNECTED)
+	{
+		Serial.println("✓ Bluetooth device CONNECTED!");
+
+		// Get connected device address
+		auto peer_addr = a2dp_sink.get_last_peer_address();
+		if (peer_addr != nullptr)
+		{
+			Serial.printf("Device MAC: %02X:%02X:%02X:%02X:%02X:%02X\n",
+						  (*peer_addr)[0], (*peer_addr)[1], (*peer_addr)[2],
+						  (*peer_addr)[3], (*peer_addr)[4], (*peer_addr)[5]);
+		}
+
+		// Update and display bonded devices list
+		Serial.println("\nUpdating bonded devices list...");
+		btDeviceManager.updateBondedDevicesList();
+		btDeviceManager.printBondedDevices();
+	}
+	else if (state == ESP_A2D_CONNECTION_STATE_DISCONNECTED)
+	{
+		Serial.println("✗ Bluetooth device DISCONNECTED");
+	}
+	else if (state == ESP_A2D_CONNECTION_STATE_CONNECTING)
+	{
+		Serial.println("⟳ Bluetooth device CONNECTING...");
+	}
+	else if (state == ESP_A2D_CONNECTION_STATE_DISCONNECTING)
+	{
+		Serial.println("⟳ Bluetooth device DISCONNECTING...");
+	}
+	Serial.println("========================================");
 }
 
 // LVGL input device callback. Allows to use encoder with LVGL Menu
@@ -396,6 +437,7 @@ void startBtSink()
 
 	a2dp_sink.set_avrc_metadata_callback(avrc_metadata_callback);
 	a2dp_sink.set_avrc_rn_playstatus_callback(avrc_playback_status_changed);
+	a2dp_sink.set_on_connection_state_changed(bt_connection_state_changed);
 
 	a2dp_sink.set_stream_reader(audio_data_callback, false);
 
@@ -733,6 +775,86 @@ void serialTask(void *param)
 				// Serial.println("  mid <value>    - Set mid gain (e.g., 'mid -2')");
 				// Serial.println("  high <value>   - Set treble gain (e.g., 'high 4')");
 				// Serial.println("  eq             - Show current settings");
+			}
+			// Bluetooth device management commands
+			else if (command == "btlist" || command == "btdevices")
+			{
+				// List all bonded Bluetooth devices
+				Serial.println("[DEBUG] Fetching bonded devices list...");
+				btDeviceManager.updateBondedDevicesList();
+				btDeviceManager.printBondedDevices();
+				Serial.println("[DEBUG] List complete");
+			}
+			else if (command == "btcount")
+			{
+				// Get count of bonded devices
+				btDeviceManager.updateBondedDevicesList();
+				int count = btDeviceManager.getBondedDevicesCount();
+				Serial.printf("Total bonded devices: %d\n", count);
+			}
+			else if (command == "btremove" || command == "btunpair")
+			{
+				// Remove a specific bonded device by index
+				int index = cmdValue.toInt();
+				if (index > 0)
+				{
+					Serial.printf("Removing device at index %d...\n", index);
+					if (btDeviceManager.removeBondedDevice(index - 1))
+					{
+						Serial.println("Device removed successfully");
+					}
+					else
+					{
+						Serial.println("Failed to remove device");
+					}
+				}
+				else
+				{
+					Serial.println("Usage: btremove <index> (e.g., 'btremove 1')");
+				}
+			}
+			else if (command == "btclear" || command == "btclearall")
+			{
+				// Clear all bonded devices
+				Serial.println("Clearing all bonded devices...");
+				btDeviceManager.clearAllBondedDevices();
+				Serial.println("All devices cleared");
+			}
+			else if (command == "bterase" || command == "btnvserase")
+			{
+				// Nuclear option - erase entire Bluetooth NVS
+				Serial.println("WARNING: This will erase ALL Bluetooth data!");
+				Serial.println("The device will need to restart after this operation.");
+				if (btDeviceManager.eraseBluetoothNVS())
+				{
+					Serial.println("Bluetooth NVS erased. Restarting in 3 seconds...");
+					vTaskDelay(3000 / portTICK_PERIOD_MS);
+					ESP.restart();
+				}
+				else
+				{
+					Serial.println("Failed to erase Bluetooth NVS");
+				}
+			}
+			else if (command == "help" || command == "?")
+			{
+				// Show available commands
+				Serial.println("\n===== Available Serial Commands =====");
+				Serial.println("EQ Commands:");
+				Serial.println("  eq              - Show current EQ settings");
+				Serial.println("  bass <value>    - Set bass gain (e.g., 'bass 6')");
+				Serial.println("  mid <value>     - Set mid gain (e.g., 'mid -2')");
+				Serial.println("  high <value>    - Set treble gain (e.g., 'high 4')");
+				Serial.println("\nBluetooth Commands:");
+				Serial.println("  btlist          - List all bonded BT devices");
+				Serial.println("  btcount         - Show count of bonded devices");
+				Serial.println("  btremove <num>  - Remove device by index (e.g., 'btremove 1')");
+				Serial.println("  btclear         - Clear all bonded devices");
+				Serial.println("  bterase         - Force erase BT NVS (for corrupted data, requires restart)");
+				Serial.println("\nOther Commands:");
+				Serial.println("  bat <value>     - Set battery value");
+				Serial.println("  help            - Show this help message");
+				Serial.println("====================================\n");
 			}
 		}
 	}
@@ -1112,12 +1234,31 @@ void setup()
 	vTaskDelay(100 / portTICK_PERIOD_MS); // Brief delay after sound playback
 	Serial.println("Startup sound playback completed");
 
+	// Check for existing bonded Bluetooth devices
+	Serial.println("\n[BOOT] Checking for bonded Bluetooth devices...");
+	btDeviceManager.updateBondedDevicesList();
+	int bondedCount = btDeviceManager.getBondedDevicesCount();
+	if (bondedCount > 0)
+	{
+		Serial.printf("[BOOT] Found %d bonded device(s):\n", bondedCount);
+		for (int i = 0; i < bondedCount; i++)
+		{
+			Serial.printf("  [%d] %s\n", i + 1, btDeviceManager.getMacAddressString(i).c_str());
+		}
+	}
+	else
+	{
+		Serial.println("[BOOT] No bonded devices found");
+	}
+	Serial.println("[BOOT] Use 'btlist' command to view bonded devices anytime");
+	Serial.println("");
+
 	// Tasks setup
 	appCommandQueue = xQueueCreate(8, sizeof(AppCommand));
 	xTaskCreatePinnedToCore(uiTask, "uiTask", 4096, NULL, 1, NULL, 1);
 	xTaskCreatePinnedToCore(encoderTask, "EncoderTask", 4096, NULL, 1, NULL, 1);
 	xTaskCreatePinnedToCore(appTask, "appTask", 3072, NULL, 3, NULL, 1); // 3rd arg matters a lot, maybe find out optimal
-	xTaskCreatePinnedToCore(serialTask, "serialTask", 1536, NULL, 1, NULL, 1);
+	xTaskCreatePinnedToCore(serialTask, "serialTask", 4096, NULL, 1, NULL, 1);
 	// xTaskCreatePinnedToCore(serialTask2, "serialTask2", 1536, NULL, 1, NULL, 1);  // for testing|debugging
 }
 
