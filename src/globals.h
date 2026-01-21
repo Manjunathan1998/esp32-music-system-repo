@@ -79,6 +79,7 @@ enum AppCommand
     CMD_SWITCH_TO_SCR_WIFI_RADIO,
     CMD_SWITCH_TO_SCR_EQ,
     CMD_SWITCH_TO_SCR_SETTINGS,
+    CMD_SWITCH_TO_SCR_BT_DEVICES,
     CMD_BT_RESTART,
     CMD_BT_STOP,
     CMD_BAT_UPDATE,
@@ -115,6 +116,10 @@ lv_obj_t *menu_screens[4];
 
 lv_group_t *focus_group_eq;
 lv_obj_t *eq_buttons[4];
+
+// Settings page focus group
+lv_group_t *focus_group_settings;
+lv_obj_t *settings_buttons[1];
 
 // Button variables
 Bounce button = Bounce();

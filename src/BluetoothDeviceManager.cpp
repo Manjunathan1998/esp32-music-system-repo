@@ -1,4 +1,5 @@
 #include "BluetoothDeviceManager.h"
+#include "esp_bt_main.h" // For esp_bluedroid_get_status()
 
 BluetoothDeviceManager::BluetoothDeviceManager()
 {
@@ -17,17 +18,27 @@ void BluetoothDeviceManager::updateBondedDevicesList()
         devicesList[i].valid = false;
     }
 
+    // Safety check: Verify Bluetooth is initialized before calling GAP functions
+    // If BT is not initialized, esp_bt_gap_get_bond_device_num() returns garbage data
+    if (esp_bluedroid_get_status() != ESP_BLUEDROID_STATUS_ENABLED)
+    {
+        Serial.println("WARNING: Bluetooth not initialized - cannot read bonded devices");
+        Serial.println("Switch to BT mode first to initialize Bluetooth stack");
+        devicesCount = 0;
+        return;
+    }
+
     // Get count of bonded devices
     int totalDevices = esp_bt_gap_get_bond_device_num();
 
     // Sanity check - if too many devices, NVS might be corrupted
-    if (totalDevices > 50)
-    {
-        Serial.printf("ERROR: %d devices reported - NVS may be corrupted!\n", totalDevices);
-        Serial.println("Consider running 'btclear' to reset bonded devices.");
-        devicesCount = 0;
-        return;
-    }
+    // if (totalDevices > 50)
+    // {
+    //     Serial.printf("ERROR: %d devices reported - NVS may be corrupted!\n", totalDevices);
+    //     Serial.println("Consider running 'btclear' to reset bonded devices.");
+    //     devicesCount = 0;
+    //     return;
+    // }
 
     devicesCount = totalDevices;
 
@@ -210,22 +221,64 @@ void BluetoothDeviceManager::clearAllBondedDevices()
     updateBondedDevicesList();
 }
 
+bool BluetoothDeviceManager::isNvsCorrupted()
+{
+    // Safety check: Only check if Bluetooth is initialized
+    if (esp_bluedroid_get_status() != ESP_BLUEDROID_STATUS_ENABLED)
+    {
+        Serial.println("[NVS Check] Bluetooth not initialized - skipping corruption check");
+        return false; // Can't determine corruption if BT not initialized
+    }
+
+    // Check raw device count from NVS without updating internal state
+    int totalDevices = esp_bt_gap_get_bond_device_num();
+    return (totalDevices > 50);
+}
+
 bool BluetoothDeviceManager::eraseBluetoothNVS()
 {
     Serial.println("WARNING: Erasing Bluetooth NVS namespace...");
     Serial.println("This will remove all Bluetooth pairing data!");
 
-    // Erase the bt_nvs namespace
-    esp_err_t err = nvs_flash_erase_partition("nvs");
+    // Open NVS handle to bt_nvs namespace
+    nvs_handle_t nvs_handle;
+    esp_err_t err = nvs_open("bt_nvs", NVS_READWRITE, &nvs_handle);
 
-    if (err == ESP_OK)
+    if (err != ESP_OK)
     {
-        Serial.println("NVS erased successfully");
-        // Reinitialize NVS
-        err = nvs_flash_init();
+        Serial.printf("Failed to open bt_nvs namespace: 0x%x\n", err);
+        Serial.println("ALTERNATIVE: Erasing entire NVS partition (last resort)...");
+        err = nvs_flash_erase_partition("nvs");
         if (err == ESP_OK)
         {
-            Serial.println("NVS reinitialized successfully");
+            Serial.println("NVS partition erased - reinitializing...");
+            err = nvs_flash_init();
+            if (err == ESP_OK)
+            {
+                Serial.println("NVS reinitialized successfully");
+                devicesCount = 0;
+                for (int i = 0; i < MAX_BONDED_DEVICES; i++)
+                {
+                    devicesList[i].valid = false;
+                }
+                return true;
+            }
+        }
+        Serial.printf("Complete NVS erase failed: 0x%x\n", err);
+        return false;
+    }
+
+    // Erase all keys in the bt_nvs namespace
+    err = nvs_erase_all(nvs_handle);
+    if (err == ESP_OK)
+    {
+        // Commit the erase operation
+        err = nvs_commit(nvs_handle);
+        nvs_close(nvs_handle);
+
+        if (err == ESP_OK)
+        {
+            Serial.println("Bluetooth NVS namespace erased successfully");
             devicesCount = 0;
             for (int i = 0; i < MAX_BONDED_DEVICES; i++)
             {
@@ -235,13 +288,14 @@ bool BluetoothDeviceManager::eraseBluetoothNVS()
         }
         else
         {
-            Serial.printf("NVS reinit failed: 0x%x\n", err);
+            Serial.printf("NVS commit failed: 0x%x\n", err);
             return false;
         }
     }
     else
     {
-        Serial.printf("NVS erase failed: 0x%x\n", err);
+        nvs_close(nvs_handle);
+        Serial.printf("Bluetooth NVS erase failed: 0x%x\n", err);
         return false;
     }
 }

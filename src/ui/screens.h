@@ -73,7 +73,12 @@ typedef struct _objects_t {
     lv_obj_t *ions_left_25;
     lv_obj_t *ions_left_70;
     lv_obj_t *ions_left_71;
+    lv_obj_t *bt_list_container;
+    lv_obj_t *lbl_mac_placeholder;
     lv_obj_t *bt_dev_count;
+    lv_obj_t *btn_clear_bt;
+    lv_obj_t *l_bt_clear;
+    lv_obj_t *total_dev_label;
 } objects_t;
 
 extern objects_t objects;

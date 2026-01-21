@@ -49,6 +49,9 @@ public:
     // Force erase Bluetooth NVS namespace (for corrupted data)
     bool eraseBluetoothNVS();
 
+    // Check if NVS is corrupted (without modifying internal state)
+    bool isNvsCorrupted();
+
     // Print bonded devices to Serial
     void printBondedDevices();
 

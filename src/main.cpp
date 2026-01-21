@@ -357,6 +357,29 @@ void switchToEQFocusGroup()
 	Serial.println(">>> EQ focus group active, btn_theater focused");
 }
 
+// FOCUS GROUP SETUP FOR SETTINGS PAGE
+void setupEncoderFocusGroupSettings()
+{
+	focus_group_settings = lv_group_create();
+	lv_group_set_wrap(focus_group_settings, true);
+
+	settings_buttons[0] = objects.btn_bt_devices;
+	lv_group_add_obj(focus_group_settings, settings_buttons[0]);
+	lv_obj_add_flag(settings_buttons[0], LV_OBJ_FLAG_SCROLL_ON_FOCUS | LV_OBJ_FLAG_CLICKABLE);
+
+	// Focus style
+	lv_obj_set_style_outline_width(settings_buttons[0], 3, LV_PART_MAIN | LV_STATE_FOCUSED);
+	lv_obj_set_style_outline_color(settings_buttons[0], lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_FOCUSED);
+}
+
+void switchToSettingsFocusGroup()
+{
+	Serial.println(">>> switchToSettingsFocusGroup called");
+	lv_indev_set_group(enc_indev, focus_group_settings);
+	lv_group_focus_obj(settings_buttons[0]);
+	Serial.println(">>> Settings focus group active, btn_bt_devices focused");
+}
+
 void switchToMainFocusGroup()
 {
 	Serial.println(">>> switchToMainFocusGroup called");
@@ -445,6 +468,24 @@ void startBtSink()
 	a2dp_sink.start("ESP32 Music");		   // Advertise device name
 	btSinkActive = true;
 	Serial.println("Bluetooth sink init done");
+
+	// Check for NVS corruption on first BT initialization only
+	static bool nvs_checked = false;
+	if (!nvs_checked)
+	{
+		vTaskDelay(500 / portTICK_PERIOD_MS); // Wait for BT GAP to initialize
+		Serial.println("\n[BT] Checking for bonded device NVS corruption...");
+		if (btDeviceManager.isNvsCorrupted())
+		{
+			Serial.println("[BT] WARNING: NVS corruption detected!");
+			Serial.println("[BT] Use 'bterase' command to fix, then manually restart device.");
+		}
+		else
+		{
+			Serial.println("[BT] NVS check passed - no corruption detected");
+		}
+		nvs_checked = true;
+	}
 }
 
 void stopBtSink()
@@ -557,19 +598,62 @@ void appTask(void *param)
 				break;
 			case CMD_SWITCH_TO_SCR_SETTINGS:
 				lv_async_call([](void *unused)
-							  { switchToScreen(menu_screens[3]); },
+							  { switchToScreen(menu_screens[3]); 
+								switchToSettingsFocusGroup(); },
 							  NULL);
 				break;
 
-			case CMD_SHUT_DOWN:
-				playMp3File(0);
-				Serial.println("Shutting down...");
-				vTaskDelay(100 / portTICK_PERIOD_MS); // allow Serial flush
-				esp_deep_sleep_start();
-				break;
+			case CMD_SWITCH_TO_SCR_BT_DEVICES:
+				lv_async_call([](void *unused)
+							  {
+								  switchToScreen(objects.bt_devices_page);
+								  // Update device count
+								  btDeviceManager.updateBondedDevicesList();
+								  int count = btDeviceManager.getBondedDevicesCount();
+								  char buf[8];
+								  snprintf(buf, sizeof(buf), "%d", count);
+								  lv_label_set_text(objects.bt_dev_count, buf);
+							  Serial.printf(">>> Device count: %d\n", count);
 
-			case CMD_BAT_UPDATE:
-				updateBatteryCharge();
+							  // Clear previous dynamic labels
+							  lv_obj_clean(objects.bt_list_container);
+
+							  if (count == 0)
+							  {
+								  // Show "No devices" message
+								  Serial.println(">>> Creating 'No paired devices' label");
+								  lv_obj_t *lbl = lv_label_create(objects.bt_list_container);
+								  lv_obj_set_pos(lbl, 10, 10);
+								  lv_label_set_text(lbl, "No paired devices");
+								  lv_obj_set_style_text_color(lbl, lv_color_hex(0xffffffff), LV_PART_MAIN | LV_STATE_DEFAULT);
+							  }
+							  else
+							  {
+								  // Create labels for all devices
+								  Serial.printf(">>> Creating %d MAC labels\n", count);
+								  uint8_t mac[6];
+								  for (int i = 0; i < count; i++)
+								  {
+									  lv_obj_t *lbl = lv_label_create(objects.bt_list_container);
+									  lv_obj_set_pos(lbl, 10, 10 + (i * 14));
+									  lv_obj_set_style_text_color(lbl, lv_color_hex(0xffffffff), LV_PART_MAIN | LV_STATE_DEFAULT);
+									  
+									  if (btDeviceManager.getMacAddressBytes(i, mac))
+									  {
+										  char macBuf[20];
+										  snprintf(macBuf, sizeof(macBuf), "%02X:%02X:%02X:%02X:%02X:%02X",
+											  mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+										  lv_label_set_text(lbl, macBuf);
+										  Serial.printf(">>> [%d] %s\n", i, macBuf);
+									  }
+									  else
+									  {
+										  lv_label_set_text(lbl, "ERROR");
+									  }
+								  }
+							  }
+							  Serial.printf("BT Devices page loaded: %d devices\n", count); },
+							  NULL);
 				break;
 
 			case CMD_EQ_SET_THEATER:
@@ -579,14 +663,14 @@ void appTask(void *param)
 				// Update button colors and maintain focus
 				lv_async_call([](void *unused)
 							  {
-					// Set Theater button to green (active)
-					lv_obj_set_style_bg_color(objects.btn_theater, lv_color_hex(0x00FF00), LV_PART_MAIN | LV_STATE_DEFAULT);
-					// Reset other buttons to default color
-					lv_obj_set_style_bg_color(objects.btn_car, lv_color_hex(0xff0292a0), LV_PART_MAIN | LV_STATE_DEFAULT);
-					lv_obj_set_style_bg_color(objects.btn_cinema, lv_color_hex(0xff0292a0), LV_PART_MAIN | LV_STATE_DEFAULT);
-					lv_obj_set_style_bg_color(objects.btn_flat, lv_color_hex(0xff0292a0), LV_PART_MAIN | LV_STATE_DEFAULT);
-					// Keep focus on Theater button
-					lv_group_focus_obj(objects.btn_theater); },
+				// Set Theater button to green (active)
+				lv_obj_set_style_bg_color(objects.btn_theater, lv_color_hex(0x00FF00), LV_PART_MAIN | LV_STATE_DEFAULT);
+				// Reset other buttons to default color
+				lv_obj_set_style_bg_color(objects.btn_car, lv_color_hex(0xff0292a0), LV_PART_MAIN | LV_STATE_DEFAULT);
+				lv_obj_set_style_bg_color(objects.btn_cinema, lv_color_hex(0xff0292a0), LV_PART_MAIN | LV_STATE_DEFAULT);
+				lv_obj_set_style_bg_color(objects.btn_flat, lv_color_hex(0xff0292a0), LV_PART_MAIN | LV_STATE_DEFAULT);
+				// Keep focus on Theater button
+				lv_group_focus_obj(objects.btn_theater); },
 							  NULL);
 				break;
 
@@ -597,14 +681,14 @@ void appTask(void *param)
 				// Update button colors and maintain focus
 				lv_async_call([](void *unused)
 							  {
-					// Set Car button to green (active)
-					lv_obj_set_style_bg_color(objects.btn_car, lv_color_hex(0x00FF00), LV_PART_MAIN | LV_STATE_DEFAULT);
-					// Reset other buttons to default color
-					lv_obj_set_style_bg_color(objects.btn_theater, lv_color_hex(0xff0292a0), LV_PART_MAIN | LV_STATE_DEFAULT);
-					lv_obj_set_style_bg_color(objects.btn_cinema, lv_color_hex(0xff0292a0), LV_PART_MAIN | LV_STATE_DEFAULT);
-					lv_obj_set_style_bg_color(objects.btn_flat, lv_color_hex(0xff0292a0), LV_PART_MAIN | LV_STATE_DEFAULT);
-					// Keep focus on Car button
-					lv_group_focus_obj(objects.btn_car); },
+				// Set Car button to green (active)
+				lv_obj_set_style_bg_color(objects.btn_car, lv_color_hex(0x00FF00), LV_PART_MAIN | LV_STATE_DEFAULT);
+				// Reset other buttons to default color
+				lv_obj_set_style_bg_color(objects.btn_theater, lv_color_hex(0xff0292a0), LV_PART_MAIN | LV_STATE_DEFAULT);
+				lv_obj_set_style_bg_color(objects.btn_cinema, lv_color_hex(0xff0292a0), LV_PART_MAIN | LV_STATE_DEFAULT);
+				lv_obj_set_style_bg_color(objects.btn_flat, lv_color_hex(0xff0292a0), LV_PART_MAIN | LV_STATE_DEFAULT);
+				// Keep focus on Car button
+				lv_group_focus_obj(objects.btn_car); },
 							  NULL);
 				break;
 
@@ -989,6 +1073,22 @@ void encoderTask(void *param)
 					}
 				}
 			}
+			else if (current_screen == objects.settings_page)
+			{
+				// We're on Settings page, check settings buttons
+				lv_obj_t *focused = lv_group_get_focused(focus_group_settings);
+				if (focused == objects.btn_bt_devices)
+				{
+					cmd = CMD_SWITCH_TO_SCR_BT_DEVICES;
+					Serial.println("CMD_SWITCH_TO_SCR_BT_DEVICES");
+				}
+			}
+			else if (current_screen == objects.bt_devices_page)
+			{
+				// We're on BT Devices page, button press goes back to Settings
+				cmd = CMD_SWITCH_TO_SCR_SETTINGS;
+				Serial.println("CMD_SWITCH_TO_SCR_SETTINGS (from BT Devices page)");
+			}
 			else
 			{
 				// We're on main menu, check main menu buttons
@@ -1227,6 +1327,10 @@ void setup()
 	setupEncoderFocusGroupEQ();
 	Serial.println("EQ focus group ready");
 
+	// Setup Settings page focus group
+	setupEncoderFocusGroupSettings();
+	Serial.println("Settings focus group ready");
+
 	// Play startup sound
 	Serial.println("Playing startup sound...");
 	vTaskDelay(200 / portTICK_PERIOD_MS); // Longer delay to ensure I2S is fully stabilized
@@ -1234,23 +1338,8 @@ void setup()
 	vTaskDelay(100 / portTICK_PERIOD_MS); // Brief delay after sound playback
 	Serial.println("Startup sound playback completed");
 
-	// Check for existing bonded Bluetooth devices
-	Serial.println("\n[BOOT] Checking for bonded Bluetooth devices...");
-	btDeviceManager.updateBondedDevicesList();
-	int bondedCount = btDeviceManager.getBondedDevicesCount();
-	if (bondedCount > 0)
-	{
-		Serial.printf("[BOOT] Found %d bonded device(s):\n", bondedCount);
-		for (int i = 0; i < bondedCount; i++)
-		{
-			Serial.printf("  [%d] %s\n", i + 1, btDeviceManager.getMacAddressString(i).c_str());
-		}
-	}
-	else
-	{
-		Serial.println("[BOOT] No bonded devices found");
-	}
-	Serial.println("[BOOT] Use 'btlist' command to view bonded devices anytime");
+	// Bluetooth will be started when needed (BT mode or BT Devices page)
+	Serial.println("\n[BOOT] Bluetooth not started yet - will init on first use");
 	Serial.println("");
 
 	// Tasks setup
