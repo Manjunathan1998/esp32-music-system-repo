@@ -3,6 +3,4 @@
 #include <SPIFFS.h>
 
 void listSPIFFS(void);
-
-void printLine(String);
 void checkBoardMemory(void);

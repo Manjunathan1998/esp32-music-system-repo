@@ -58,7 +58,6 @@ static lv_color_t *buf = NULL; // works with external SRAM
 static lv_disp_draw_buf_t draw_buf;
 
 // Functions declarations
-
 void drawTestScreen()
 {
 	// draw test rectangle
@@ -445,7 +444,7 @@ void startBtSink()
 		Serial.println("Applying EQ for BT mode...");
 		Serial.printf("EQ values - Bass: %.1f, Mid: %.1f, Treble: %.1f\n", bassGain, midGain, trebleGain);
 		equalizer->setAudioInfo(info);
-		auto eq_cfg = equalizer->defaultConfig();
+		auto &eq_cfg = equalizer->defaultConfig();
 		eq_cfg.sample_rate = 44100;
 		eq_cfg.channels = 2;
 		eq_cfg.bits_per_sample = 16;
@@ -457,6 +456,9 @@ void startBtSink()
 		equalizer->begin(eq_cfg);
 		Serial.println("EQ applied");
 	}
+
+	// Ensure A2DP audio is 16-bit PCM (required by Equalizer3Bands)
+	a2dp_sink.set_bits_per_sample(16);
 
 	a2dp_sink.set_avrc_metadata_callback(avrc_metadata_callback);
 	a2dp_sink.set_avrc_rn_playstatus_callback(avrc_playback_status_changed);
@@ -523,7 +525,7 @@ void applyEq(float bassGain, float midGain, float trebleGain)
 			return;
 		}
 
-		auto eq_cfg = equalizer->defaultConfig();
+		auto &eq_cfg = equalizer->defaultConfig();
 		eq_cfg.sample_rate = 44100;
 		eq_cfg.channels = 2;
 		eq_cfg.bits_per_sample = 16;
@@ -563,7 +565,7 @@ void appTask(void *param)
 				{
 					Serial.println("Reinitializing equalizer before BT mode...");
 					equalizer->setAudioInfo(info);
-					auto eq_cfg = equalizer->defaultConfig();
+					auto &eq_cfg = equalizer->defaultConfig();
 					eq_cfg.sample_rate = 44100;
 					eq_cfg.channels = 2;
 					eq_cfg.bits_per_sample = 16;
@@ -1184,7 +1186,7 @@ void setup()
 
 	// I2S and audio setup
 	Serial.printf("Free heap before i2s begin: %u bytes\n", esp_get_free_heap_size());
-	AudioToolsLogger.begin(Serial, AudioToolsLogLevel::Info);
+	AudioToolsLogger.begin(Serial, AudioToolsLogLevel::Warning);
 	Serial.println("Starting I2S...");
 	auto cfg = i2s.defaultConfig(TX_MODE);
 	cfg.pin_bck = I2S_BCK;
@@ -1208,7 +1210,7 @@ void setup()
 	// Set audio info first
 	equalizer->setAudioInfo(info);
 
-	auto eq_config = equalizer->defaultConfig();
+	auto &eq_config = equalizer->defaultConfig();
 	eq_config.sample_rate = 44100;
 	eq_config.channels = 2;
 	eq_config.bits_per_sample = 16;
