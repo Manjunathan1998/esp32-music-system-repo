@@ -513,18 +513,6 @@ void applyEq(float bassGain, float midGain, float trebleGain)
 	// Apply to equalizer in real-time
 	if (equalizer)
 	{
-		// CRITICAL: Only apply if I2S is active (audio is playing)
-		// Calling begin() on idle I2S corrupts equalizer state
-		if (!i2s.isActive())
-		{
-			Serial.println("WARNING: I2S not active, storing EQ values but NOT applying");
-			// Just store the values for later
-			::bassGain = bassGain;
-			::midGain = midGain;
-			::trebleGain = trebleGain;
-			return;
-		}
-
 		auto &eq_cfg = equalizer->defaultConfig();
 		eq_cfg.sample_rate = 44100;
 		eq_cfg.channels = 2;
@@ -659,8 +647,14 @@ void appTask(void *param)
 				break;
 
 			case CMD_EQ_SET_THEATER:
+				bassGain = 1.0;
+				midGain = 1.5;
+				trebleGain = 2.0;
+
 				Serial.println(">>> Executing: CMD_EQ_SET_THEATER");
-				applyEq(1.0, 1.0, 4.0);
+				Serial.printf("EQ preset THEATER -> Bass: %.1f, Mid: %.1f, Treble: %.1f\n", bassGain, midGain, trebleGain);
+
+				applyEq(bassGain, midGain, trebleGain);
 
 				// Update button colors and maintain focus
 				lv_async_call([](void *unused)
@@ -677,8 +671,14 @@ void appTask(void *param)
 				break;
 
 			case CMD_EQ_SET_CAR:
+				bassGain = 2.0;
+				midGain = 2.5;
+				trebleGain = 0.3;
+
 				Serial.println(">>> Executing: CMD_EQ_SET_CAR");
-				applyEq(1.0, 1.0, 0.1);
+				Serial.printf("EQ preset CAR -> Bass: %.1f, Mid: %.1f, Treble: %.1f\n", bassGain, midGain, trebleGain);
+
+				applyEq(bassGain, midGain, trebleGain);
 
 				// Update button colors and maintain focus
 				lv_async_call([](void *unused)
@@ -695,8 +695,14 @@ void appTask(void *param)
 				break;
 
 			case CMD_EQ_SET_CINEMA:
+				bassGain = 1.5;
+				midGain = 2.0;
+				trebleGain = 1.0;
+
 				Serial.println(">>> Executing: CMD_EQ_SET_CINEMA");
-				applyEq(1.5, 1.0, 1.2);
+				Serial.printf("EQ preset CINEMA -> Bass: %.1f, Mid: %.1f, Treble: %.1f\n", bassGain, midGain, trebleGain);
+
+				applyEq(bassGain, midGain, trebleGain);
 
 				// Update button colors and maintain focus
 				lv_async_call([](void *unused)
@@ -713,8 +719,13 @@ void appTask(void *param)
 				break;
 
 			case CMD_EQ_SET_FLAT:
+				bassGain = 1.0;
+				midGain = 1.0;
+				trebleGain = 1.0;
+
 				Serial.println(">>> Executing: CMD_EQ_SET_FLAT");
-				applyEq(1.0, 1.0, 1.0);
+				Serial.printf("EQ preset FLAT -> Bass: %.1f, Mid: %.1f, Treble: %.1f\n", bassGain, midGain, trebleGain);
+				applyEq(bassGain, midGain, trebleGain);
 
 				// Update button colors and maintain focus
 				lv_async_call([](void *unused)
@@ -783,70 +794,19 @@ void serialTask(void *param)
 			{
 				float newGain = cmdValue.toFloat();
 				bassGain = newGain;
-				// Serial.printf("Bass set to: %.1f dB\n", bassGain);
-
-				// Apply immediately
-				if (equalizer)
-				{
-					equalizer->setAudioInfo(info); // Ensure audio info is set
-					auto eq_cfg = equalizer->defaultConfig();
-					eq_cfg.sample_rate = 44100;
-					eq_cfg.channels = 2;
-					eq_cfg.bits_per_sample = 16;
-					eq_cfg.freq_low = 500;
-					eq_cfg.freq_high = 3000;
-					eq_cfg.gain_low = bassGain;
-					eq_cfg.gain_medium = midGain;
-					eq_cfg.gain_high = trebleGain;
-					equalizer->begin(eq_cfg);
-					// Serial.println("EQ updated!");
-				}
+				applyEq(bassGain, 1.0, 1.0);
 			}
 			else if (command == "mid")
 			{
 				float newGain = cmdValue.toFloat();
 				midGain = newGain;
-				// Serial.printf("Mid set to: %.1f dB\n", midGain);
-
-				// Apply immediately
-				if (equalizer)
-				{
-					equalizer->setAudioInfo(info); // Ensure audio info is set
-					auto eq_cfg = equalizer->defaultConfig();
-					eq_cfg.sample_rate = 44100;
-					eq_cfg.channels = 2;
-					eq_cfg.bits_per_sample = 16;
-					eq_cfg.freq_low = 500;
-					eq_cfg.freq_high = 3000;
-					eq_cfg.gain_low = bassGain;
-					eq_cfg.gain_medium = midGain;
-					eq_cfg.gain_high = trebleGain;
-					equalizer->begin(eq_cfg);
-					// Serial.println("EQ updated!");
-				}
+				applyEq(1.0, midGain, 1.0);
 			}
 			else if (command == "high" || command == "treble")
 			{
 				float newGain = cmdValue.toFloat();
 				trebleGain = newGain;
-				// Serial.printf("Treble set to: %.1f dB\n", trebleGain);
-
-				// Apply immediately
-				if (equalizer)
-				{
-					equalizer->setAudioInfo(info); // Ensure audio info is set
-					auto eq_cfg = equalizer->defaultConfig();
-					eq_cfg.sample_rate = 44100;
-					eq_cfg.channels = 2;
-					eq_cfg.bits_per_sample = 16;
-					eq_cfg.freq_low = 500;
-					eq_cfg.freq_high = 3000;
-					eq_cfg.gain_low = bassGain;
-					eq_cfg.gain_medium = midGain;
-					eq_cfg.gain_high = trebleGain;
-					equalizer->begin(eq_cfg);
-					// Serial.println("EQ updated!");
-				}
+				applyEq(1.0, 1.0, trebleGain);
 			}
 			else if (command == "eq")
 			{
