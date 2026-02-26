@@ -85,6 +85,17 @@ void avrc_metadata_callback(uint8_t attr_id, const uint8_t *attr_text)
 		Serial.print("Title: ");
 		strncpy(trackName, (const char *)attr_text, sizeof(trackName) - 1);
 		trackName[sizeof(trackName) - 1] = '\0';
+
+		// Update device name in queue if we didn't have it on connection
+		{
+			auto peer_addr = a2dp_sink.get_last_peer_address();
+			const char *peerName = a2dp_sink.get_peer_name();
+			if (peer_addr != nullptr && peerName != nullptr && strlen(peerName) > 0)
+			{
+				Serial.printf("[Metadata] Updating device name to: %s\n", peerName);
+				btDeviceManager.queueDeviceForSave((uint8_t *)(*peer_addr), peerName);
+			}
+		}
 		break;
 	case ESP_AVRC_MD_ATTR_ARTIST:
 		Serial.print("Artist: ");
@@ -158,12 +169,22 @@ void bt_connection_state_changed(esp_a2d_connection_state_t state, void *ptr)
 			Serial.printf("Device MAC: %02X:%02X:%02X:%02X:%02X:%02X\n",
 						  (*peer_addr)[0], (*peer_addr)[1], (*peer_addr)[2],
 						  (*peer_addr)[3], (*peer_addr)[4], (*peer_addr)[5]);
-		}
 
-		// Update and display bonded devices list
-		Serial.println("\nUpdating bonded devices list...");
-		btDeviceManager.updateBondedDevicesList();
-		btDeviceManager.printBondedDevices();
+			// Queue device info - name may not be available yet
+			// Will be updated if/when metadata arrives
+			const char *peerName = a2dp_sink.get_peer_name();
+			if (peerName != nullptr && strlen(peerName) > 0)
+			{
+				Serial.printf("Device Name: %s\n", peerName);
+				btDeviceManager.queueDeviceForSave((uint8_t *)(*peer_addr), peerName);
+			}
+			else
+			{
+				Serial.println("Device Name: Not available yet, will update from metadata");
+				// Queue with MAC only for now - will be updated when metadata arrives
+				btDeviceManager.queueDeviceForSave((uint8_t *)(*peer_addr), nullptr);
+			}
+		}
 	}
 	else if (state == ESP_A2D_CONNECTION_STATE_DISCONNECTED)
 	{
@@ -379,6 +400,28 @@ void switchToSettingsFocusGroup()
 	Serial.println(">>> Settings focus group active, btn_bt_devices focused");
 }
 
+// FOCUS GROUP SETUP FOR BT DEVICES PAGE
+void setupEncoderFocusGroupBTDevices()
+{
+	focus_group_bt_devices = lv_group_create();
+	lv_group_set_wrap(focus_group_bt_devices, true);
+
+	lv_group_add_obj(focus_group_bt_devices, objects.btn_clear_bt);
+	lv_obj_add_flag(objects.btn_clear_bt, LV_OBJ_FLAG_SCROLL_ON_FOCUS | LV_OBJ_FLAG_CLICKABLE);
+
+	// Focus style
+	lv_obj_set_style_outline_width(objects.btn_clear_bt, 3, LV_PART_MAIN | LV_STATE_FOCUSED);
+	lv_obj_set_style_outline_color(objects.btn_clear_bt, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_FOCUSED);
+}
+
+void switchToBTDevicesFocusGroup()
+{
+	Serial.println(">>> switchToBTDevicesFocusGroup called");
+	lv_indev_set_group(enc_indev, focus_group_bt_devices);
+	lv_group_focus_obj(objects.btn_clear_bt);
+	Serial.println(">>> BT Devices focus group active, btn_clear_bt focused");
+}
+
 void switchToMainFocusGroup()
 {
 	Serial.println(">>> switchToMainFocusGroup called");
@@ -495,8 +538,16 @@ void stopBtSink()
 	if (btSinkActive)
 	{
 		Serial.println("Stopping A2DP sink...");
+
+		// Process any pending device saves before disconnecting
+		btDeviceManager.processPendingSaves();
+
 		a2dp_sink.disconnect();
 		vTaskDelay(600 / portTICK_PERIOD_MS);
+
+		// NOTE: Don't call a2dp_sink.end() here as it clears bonded device list
+		// Just disconnect is sufficient to stop audio
+
 		btSinkActive = false;
 		Serial.println("Sink stopped");
 	}
@@ -597,8 +648,12 @@ void appTask(void *param)
 				lv_async_call([](void *unused)
 							  {
 								  switchToScreen(objects.bt_devices_page);
-								  // Update device count
-								  btDeviceManager.updateBondedDevicesList();
+								  
+								  // Process any pending device saves first
+								  btDeviceManager.processPendingSaves();
+								  
+								  // Load devices from SPIFFS file (recent connections)
+								  btDeviceManager.loadDevicesFromFile();
 								  int count = btDeviceManager.getBondedDevicesCount();
 								  char buf[8];
 								  snprintf(buf, sizeof(buf), "%d", count);
@@ -619,30 +674,43 @@ void appTask(void *param)
 							  }
 							  else
 							  {
-								  // Create labels for all devices
-								  Serial.printf(">>> Creating %d MAC labels\n", count);
-								  uint8_t mac[6];
+								  // Create labels showing device names
+								  Serial.printf(">>> Creating %d device labels\n", count);
 								  for (int i = 0; i < count; i++)
 								  {
 									  lv_obj_t *lbl = lv_label_create(objects.bt_list_container);
 									  lv_obj_set_pos(lbl, 10, 10 + (i * 14));
 									  lv_obj_set_style_text_color(lbl, lv_color_hex(0xffffffff), LV_PART_MAIN | LV_STATE_DEFAULT);
 									  
-									  if (btDeviceManager.getMacAddressBytes(i, mac))
-									  {
-										  char macBuf[20];
-										  snprintf(macBuf, sizeof(macBuf), "%02X:%02X:%02X:%02X:%02X:%02X",
-											  mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-										  lv_label_set_text(lbl, macBuf);
-										  Serial.printf(">>> [%d] %s\n", i, macBuf);
-									  }
-									  else
-									  {
-										  lv_label_set_text(lbl, "ERROR");
-									  }
+									  String deviceName = btDeviceManager.getDeviceName(i);
+									  lv_label_set_text(lbl, deviceName.c_str());
+									  Serial.printf(">>> [%d] %s\n", i, deviceName.c_str());
 								  }
 							  }
-							  Serial.printf("BT Devices page loaded: %d devices\n", count); },
+							  Serial.printf("BT Devices page loaded: %d devices\n", count); 
+							  
+							  // Activate BT devices focus group
+							  switchToBTDevicesFocusGroup(); },
+							  NULL);
+				break;
+
+			case CMD_BT_CLEAR_DEVICES:
+				Serial.println(">>> Executing: CMD_BT_CLEAR_DEVICES");
+				btDeviceManager.clearAllDevices();
+				// Refresh the page display
+				lv_async_call([](void *unused)
+							  {
+								  // Update device count to 0
+								  lv_label_set_text(objects.bt_dev_count, "0");
+								  
+								  // Clear list and show empty message
+								  lv_obj_clean(objects.bt_list_container);
+								  lv_obj_t *lbl = lv_label_create(objects.bt_list_container);
+								  lv_obj_set_pos(lbl, 10, 10);
+								  lv_label_set_text(lbl, "No devices");
+								  lv_obj_set_style_text_color(lbl, lv_color_hex(0xffffffff), LV_PART_MAIN | LV_STATE_DEFAULT);
+								  
+								  Serial.println(">>> Display updated: All devices cleared"); },
 							  NULL);
 				break;
 
@@ -1047,9 +1115,19 @@ void encoderTask(void *param)
 			}
 			else if (current_screen == objects.bt_devices_page)
 			{
-				// We're on BT Devices page, button press goes back to Settings
-				cmd = CMD_SWITCH_TO_SCR_SETTINGS;
-				Serial.println("CMD_SWITCH_TO_SCR_SETTINGS (from BT Devices page)");
+				// We're on BT Devices page, check if clear button is focused
+				lv_obj_t *focused = lv_group_get_focused(focus_group_bt_devices);
+				if (focused == objects.btn_clear_bt)
+				{
+					cmd = CMD_BT_CLEAR_DEVICES;
+					Serial.println("CMD_BT_CLEAR_DEVICES");
+				}
+				else
+				{
+					// No button focused, go back to Settings
+					cmd = CMD_SWITCH_TO_SCR_SETTINGS;
+					Serial.println("CMD_SWITCH_TO_SCR_SETTINGS (from BT Devices page)");
+				}
 			}
 			else
 			{
@@ -1292,6 +1370,10 @@ void setup()
 	// Setup Settings page focus group
 	setupEncoderFocusGroupSettings();
 	Serial.println("Settings focus group ready");
+
+	// Setup BT Devices page focus group
+	setupEncoderFocusGroupBTDevices();
+	Serial.println("BT Devices focus group ready");
 
 	// Play startup sound
 	Serial.println("Playing startup sound...");

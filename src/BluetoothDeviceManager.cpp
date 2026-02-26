@@ -4,10 +4,343 @@
 BluetoothDeviceManager::BluetoothDeviceManager()
 {
     devicesCount = 0;
+    pendingDevice.pending = false;
     for (int i = 0; i < MAX_BONDED_DEVICES; i++)
     {
         devicesList[i].valid = false;
+        devicesList[i].name[0] = '\0';
     }
+}
+
+void BluetoothDeviceManager::queueDeviceForSave(uint8_t *macAddress, const char *deviceName)
+{
+    if (macAddress == NULL)
+        return;
+
+    memcpy(pendingDevice.address, macAddress, 6);
+
+    if (deviceName != NULL && strlen(deviceName) > 0)
+    {
+        strncpy(pendingDevice.name, deviceName, MAX_DEVICE_NAME_LEN - 1);
+        pendingDevice.name[MAX_DEVICE_NAME_LEN - 1] = '\0';
+    }
+    else
+    {
+        snprintf(pendingDevice.name, sizeof(pendingDevice.name), "%02X:%02X:%02X:%02X:%02X:%02X",
+                 macAddress[0], macAddress[1], macAddress[2],
+                 macAddress[3], macAddress[4], macAddress[5]);
+    }
+
+    pendingDevice.pending = true;
+    Serial.printf("[BT History] Queued device for save: %s\n", pendingDevice.name);
+}
+
+void BluetoothDeviceManager::processPendingSaves()
+{
+    if (pendingDevice.pending)
+    {
+        Serial.println("[BT History] Processing pending device save...");
+        addDevice(pendingDevice.address, pendingDevice.name);
+        pendingDevice.pending = false;
+    }
+}
+
+void BluetoothDeviceManager::loadDevicesFromFile()
+{
+    // Clear existing list
+    devicesCount = 0;
+    for (int i = 0; i < MAX_BONDED_DEVICES; i++)
+    {
+        devicesList[i].valid = false;
+        devicesList[i].name[0] = '\0';
+    }
+
+    if (!SPIFFS.exists(BT_DEVICES_FILE))
+    {
+        Serial.println("[BT Load] No device file found");
+        return;
+    }
+
+    File file = SPIFFS.open(BT_DEVICES_FILE, "r");
+    if (!file)
+    {
+        Serial.println("[BT Load] Failed to open file");
+        return;
+    }
+
+    Serial.println("[BT Load] Loading devices from SPIFFS...");
+    int count = 0;
+
+    Serial.printf("[BT Load] File contents:\n");
+    while (file.available() && count < MAX_BONDED_DEVICES)
+    {
+        String line = file.readStringUntil('\n');
+        line.trim();
+
+        Serial.printf("[BT Load]   Raw line %d: '%s'\n", count, line.c_str());
+
+        if (line.length() == 0)
+        {
+            Serial.println("[BT Load]   -> Empty line, skipping");
+            continue;
+        }
+
+        int separatorIndex = line.indexOf('|');
+        if (separatorIndex == -1)
+        {
+            Serial.println("[BT Load]   -> No separator found, skipping");
+            continue;
+        }
+
+        String macStr = line.substring(0, separatorIndex);
+        String nameStr = line.substring(separatorIndex + 1);
+
+        Serial.printf("[BT Load]   -> MAC: '%s', Name: '%s'\n", macStr.c_str(), nameStr.c_str());
+
+        if (macStr.length() == 17)
+        {
+            uint8_t mac[6];
+            if (sscanf(macStr.c_str(), "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
+                       &mac[0], &mac[1], &mac[2], &mac[3], &mac[4], &mac[5]) == 6)
+            {
+                memcpy(devicesList[count].address, mac, 6);
+                strncpy(devicesList[count].name, nameStr.c_str(), MAX_DEVICE_NAME_LEN - 1);
+                devicesList[count].name[MAX_DEVICE_NAME_LEN - 1] = '\0';
+                devicesList[count].valid = true;
+                Serial.printf("[BT Load] [%d] %s - %s\n", count, macStr.c_str(), nameStr.c_str());
+                count++;
+            }
+        }
+    }
+
+    file.close();
+    devicesCount = count;
+    Serial.printf("[BT Load] Loaded %d device(s) from file\n", devicesCount);
+}
+
+int BluetoothDeviceManager::findDeviceByMac(uint8_t *macAddress)
+{
+    if (macAddress == NULL)
+        return -1;
+
+    for (int i = 0; i < devicesCount; i++)
+    {
+        if (devicesList[i].valid &&
+            memcmp(devicesList[i].address, macAddress, 6) == 0)
+        {
+            return i;
+        }
+    }
+    return -1;
+}
+
+String BluetoothDeviceManager::lookupDeviceNameInFile(uint8_t *macAddress)
+{
+    if (macAddress == NULL || !SPIFFS.exists(BT_DEVICES_FILE))
+    {
+        Serial.println("[BT Lookup] File doesn't exist or NULL MAC");
+        return "";
+    }
+
+    File file = SPIFFS.open(BT_DEVICES_FILE, "r");
+    if (!file)
+    {
+        Serial.println("[BT Lookup] Failed to open file");
+        return "";
+    }
+
+    char searchMac[18];
+    snprintf(searchMac, sizeof(searchMac), "%02X:%02X:%02X:%02X:%02X:%02X",
+             macAddress[0], macAddress[1], macAddress[2],
+             macAddress[3], macAddress[4], macAddress[5]);
+    Serial.printf("[BT Lookup] Searching for: %s\n", searchMac);
+
+    while (file.available())
+    {
+        String line = file.readStringUntil('\n');
+        line.trim();
+
+        if (line.length() == 0)
+            continue;
+
+        int pipeIndex = line.indexOf('|');
+        if (pipeIndex < 0)
+            continue;
+
+        String macStr = line.substring(0, pipeIndex);
+        String nameStr = line.substring(pipeIndex + 1);
+
+        Serial.printf("[BT Lookup] Checking line: %s\n", line.c_str());
+
+        if (macStr.length() == 17)
+        {
+            uint8_t mac[6];
+            if (sscanf(macStr.c_str(), "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
+                       &mac[0], &mac[1], &mac[2], &mac[3], &mac[4], &mac[5]) == 6)
+            {
+                if (memcmp(mac, macAddress, 6) == 0)
+                {
+                    file.close();
+                    Serial.printf("[BT Lookup] FOUND: %s\n", nameStr.c_str());
+                    return nameStr;
+                }
+            }
+        }
+    }
+
+    file.close();
+    Serial.println("[BT Lookup] Not found");
+    return "";
+}
+
+void BluetoothDeviceManager::saveDevicesToFile()
+{
+    File file = SPIFFS.open(BT_DEVICES_FILE, "w");
+    if (!file)
+    {
+        Serial.println("[BT History] ERROR: Failed to open file for writing");
+        return;
+    }
+
+    for (int i = 0; i < devicesCount; i++)
+    {
+        if (devicesList[i].valid && strlen(devicesList[i].name) > 0)
+        {
+            file.printf("%02X:%02X:%02X:%02X:%02X:%02X|%s\n",
+                        devicesList[i].address[0], devicesList[i].address[1],
+                        devicesList[i].address[2], devicesList[i].address[3],
+                        devicesList[i].address[4], devicesList[i].address[5],
+                        devicesList[i].name);
+        }
+    }
+
+    file.close();
+    Serial.println("[BT History] File saved successfully");
+}
+
+void BluetoothDeviceManager::addDevice(uint8_t *macAddress, const char *deviceName)
+{
+    if (macAddress == NULL)
+        return;
+
+    char defaultName[18];
+    if (deviceName == NULL || strlen(deviceName) == 0)
+    {
+        snprintf(defaultName, sizeof(defaultName), "%02X:%02X:%02X:%02X:%02X:%02X",
+                 macAddress[0], macAddress[1], macAddress[2],
+                 macAddress[3], macAddress[4], macAddress[5]);
+        deviceName = defaultName;
+    }
+
+    Serial.printf("[BT History] Adding device: %s\n", deviceName);
+
+    // Load existing names from file
+    if (!SPIFFS.exists(BT_DEVICES_FILE))
+    {
+        File file = SPIFFS.open(BT_DEVICES_FILE, "w");
+        if (file)
+            file.close();
+    }
+
+    // Read current file into temporary storage
+    String lines[MAX_BONDED_DEVICES];
+    int lineCount = 0;
+    bool deviceFound = false;
+
+    File file = SPIFFS.open(BT_DEVICES_FILE, "r");
+    if (file)
+    {
+        while (file.available() && lineCount < MAX_BONDED_DEVICES)
+        {
+            String line = file.readStringUntil('\n');
+            line.trim();
+            if (line.length() == 0)
+                continue;
+
+            int pipeIndex = line.indexOf('|');
+            if (pipeIndex < 0)
+                continue;
+
+            String macStr = line.substring(0, pipeIndex);
+            uint8_t mac[6];
+
+            if (macStr.length() == 17 &&
+                sscanf(macStr.c_str(), "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
+                       &mac[0], &mac[1], &mac[2], &mac[3], &mac[4], &mac[5]) == 6)
+            {
+                if (memcmp(mac, macAddress, 6) == 0)
+                {
+                    // Update this device's name
+                    char macBuf[18];
+                    snprintf(macBuf, sizeof(macBuf), "%02X:%02X:%02X:%02X:%02X:%02X",
+                             macAddress[0], macAddress[1], macAddress[2],
+                             macAddress[3], macAddress[4], macAddress[5]);
+                    lines[lineCount++] = String(macBuf) + "|" + String(deviceName);
+                    deviceFound = true;
+                }
+                else
+                {
+                    lines[lineCount++] = line;
+                }
+            }
+        }
+        file.close();
+    }
+
+    // Add new device if not found
+    if (!deviceFound && lineCount < MAX_BONDED_DEVICES)
+    {
+        char macBuf[18];
+        snprintf(macBuf, sizeof(macBuf), "%02X:%02X:%02X:%02X:%02X:%02X",
+                 macAddress[0], macAddress[1], macAddress[2],
+                 macAddress[3], macAddress[4], macAddress[5]);
+        lines[lineCount++] = String(macBuf) + "|" + String(deviceName);
+    }
+    else if (!deviceFound && lineCount >= MAX_BONDED_DEVICES)
+    {
+        // Remove oldest, add new
+        for (int i = 0; i < MAX_BONDED_DEVICES - 1; i++)
+        {
+            lines[i] = lines[i + 1];
+        }
+        char macBuf[18];
+        snprintf(macBuf, sizeof(macBuf), "%02X:%02X:%02X:%02X:%02X:%02X",
+                 macAddress[0], macAddress[1], macAddress[2],
+                 macAddress[3], macAddress[4], macAddress[5]);
+        lines[MAX_BONDED_DEVICES - 1] = String(macBuf) + "|" + String(deviceName);
+        lineCount = MAX_BONDED_DEVICES;
+    }
+
+    // Write back to file
+    file = SPIFFS.open(BT_DEVICES_FILE, "w");
+    if (file)
+    {
+        Serial.printf("[BT History] Writing %d lines to file:\n", lineCount);
+        for (int i = 0; i < lineCount; i++)
+        {
+            file.println(lines[i]);
+            Serial.printf("[BT History]   Line %d: %s\n", i, lines[i].c_str());
+        }
+        file.close();
+        Serial.println("[BT History] Device saved to file successfully");
+    }
+    else
+    {
+        Serial.println("[BT History] ERROR: Failed to open file for writing!");
+    }
+}
+
+String BluetoothDeviceManager::getDeviceName(int index)
+{
+    if (index >= 0 && index < devicesCount && devicesList[index].valid)
+    {
+        if (strlen(devicesList[index].name) > 0)
+        {
+            return String(devicesList[index].name);
+        }
+        return getMacAddressString(index);
+    }
+    return "N/A";
 }
 
 void BluetoothDeviceManager::updateBondedDevicesList()
@@ -61,11 +394,31 @@ void BluetoothDeviceManager::updateBondedDevicesList()
 
             if (ret == ESP_OK)
             {
-                // Copy devices to internal list
+                // Copy devices to internal list and lookup names from SPIFFS
+                Serial.println("[BT] Looking up device names from SPIFFS...");
                 for (int i = 0; i < devicesCount; i++)
                 {
                     memcpy(devicesList[i].address, dev_list[i], 6);
                     devicesList[i].valid = true;
+
+                    char macStr[18];
+                    snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X",
+                             dev_list[i][0], dev_list[i][1], dev_list[i][2],
+                             dev_list[i][3], dev_list[i][4], dev_list[i][5]);
+
+                    // Try to get name from SPIFFS file
+                    String storedName = lookupDeviceNameInFile(dev_list[i]);
+                    if (storedName.length() > 0)
+                    {
+                        strncpy(devicesList[i].name, storedName.c_str(), MAX_DEVICE_NAME_LEN - 1);
+                        devicesList[i].name[MAX_DEVICE_NAME_LEN - 1] = '\0';
+                        Serial.printf("[BT] Device %d (%s): Found name '%s'\n", i, macStr, devicesList[i].name);
+                    }
+                    else
+                    {
+                        devicesList[i].name[0] = '\0';
+                        Serial.printf("[BT] Device %d (%s): No name found, will show MAC\n", i, macStr);
+                    }
                 }
                 Serial.printf("Successfully loaded %d bonded device(s)\n", devicesCount);
             }
@@ -92,6 +445,93 @@ void BluetoothDeviceManager::updateBondedDevicesList()
 int BluetoothDeviceManager::getBondedDevicesCount()
 {
     return devicesCount;
+}
+
+bool BluetoothDeviceManager::clearAllDevices()
+{
+    Serial.println("[BT Clear] Clearing all devices...");
+
+    // Step 1: Clear SPIFFS file
+    if (SPIFFS.exists(BT_DEVICES_FILE))
+    {
+        if (SPIFFS.remove(BT_DEVICES_FILE))
+        {
+            Serial.println("[BT Clear] SPIFFS file deleted");
+        }
+        else
+        {
+            Serial.println("[BT Clear] ERROR: Failed to delete SPIFFS file");
+        }
+    }
+    else
+    {
+        Serial.println("[BT Clear] SPIFFS file doesn't exist");
+    }
+
+    // Step 2: Clear internal list
+    devicesCount = 0;
+    for (int i = 0; i < MAX_BONDED_DEVICES; i++)
+    {
+        devicesList[i].valid = false;
+        devicesList[i].name[0] = '\0';
+    }
+
+    // Step 3: Clear NVS bonded devices (if BT is initialized)
+    if (esp_bluedroid_get_status() == ESP_BLUEDROID_STATUS_ENABLED)
+    {
+        Serial.println("[BT Clear] Clearing bonded devices from NVS...");
+
+        int totalDevices = esp_bt_gap_get_bond_device_num();
+        Serial.printf("[BT Clear] Found %d bonded device(s) in NVS\n", totalDevices);
+
+        if (totalDevices > 0)
+        {
+            int maxToClear = (totalDevices > 100) ? 100 : totalDevices;
+            esp_bd_addr_t *dev_list = (esp_bd_addr_t *)malloc(sizeof(esp_bd_addr_t) * maxToClear);
+
+            if (dev_list != NULL)
+            {
+                int deviceCount = maxToClear;
+                esp_err_t ret = esp_bt_gap_get_bond_device_list(&deviceCount, dev_list);
+
+                if (ret == ESP_OK)
+                {
+                    int clearedCount = 0;
+                    for (int i = 0; i < deviceCount; i++)
+                    {
+                        ret = esp_bt_gap_remove_bond_device(dev_list[i]);
+                        if (ret == ESP_OK)
+                        {
+                            clearedCount++;
+                        }
+                    }
+                    Serial.printf("[BT Clear] Cleared %d bonded device(s) from NVS\n", clearedCount);
+                }
+                else
+                {
+                    Serial.printf("[BT Clear] ERROR: Failed to get NVS device list: 0x%x\n", ret);
+                }
+
+                free(dev_list);
+            }
+            else
+            {
+                Serial.println("[BT Clear] ERROR: Memory allocation failed");
+            }
+        }
+        else
+        {
+            Serial.println("[BT Clear] No bonded devices in NVS to clear");
+        }
+    }
+    else
+    {
+        Serial.println("[BT Clear] WARNING: Bluetooth not initialized - NVS bonding data not cleared");
+        Serial.println("[BT Clear] Note: Only SPIFFS file was cleared");
+    }
+
+    Serial.println("[BT Clear] Clear operation completed");
+    return true;
 }
 
 String BluetoothDeviceManager::getMacAddressString(int index)

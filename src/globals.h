@@ -14,6 +14,10 @@
 #define I2S_WS 25
 #define I2S_DATA 26
 
+#define I2S_MIC_SCK_PIN 13
+#define I2S_MIC_WS_PIN 5
+#define I2S_MIC_SD_PIN 32
+
 #define ENCODER_CLK_PIN 34
 #define ENCODER_DT_PIN 4
 #define ENCODER_BTN_PIN 35
@@ -80,6 +84,7 @@ enum AppCommand
     CMD_SWITCH_TO_SCR_EQ,
     CMD_SWITCH_TO_SCR_SETTINGS,
     CMD_SWITCH_TO_SCR_BT_DEVICES,
+    CMD_BT_CLEAR_DEVICES,
     CMD_BT_RESTART,
     CMD_BT_STOP,
     CMD_BAT_UPDATE,
@@ -120,6 +125,9 @@ lv_obj_t *eq_buttons[4];
 // Settings page focus group
 lv_group_t *focus_group_settings;
 lv_obj_t *settings_buttons[1];
+
+// BT Devices page focus group
+lv_group_t *focus_group_bt_devices;
 
 // Button variables
 Bounce button = Bounce();
